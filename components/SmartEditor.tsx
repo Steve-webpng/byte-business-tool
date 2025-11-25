@@ -5,6 +5,11 @@ import { getProfile, formatProfileForPrompt } from '../services/settingsService'
 import { saveItem, getSavedItems } from '../services/supabaseService';
 import { SavedItem } from '../types';
 
+interface SmartEditorProps {
+  workflowData?: string | null;
+  clearWorkflowData?: () => void;
+}
+
 const TEMPLATES = [
   { name: "Meeting Notes", text: "Date:\nAttendees:\n\nAgenda:\n1.\n2.\n\nAction Items:\n- [ ] " },
   { name: "Project Proposal", text: "# Project Title\n\n## Executive Summary\n[Brief overview]\n\n## Objectives\n- Goal 1\n- Goal 2\n\n## Timeline\n[Dates]" },
@@ -12,7 +17,7 @@ const TEMPLATES = [
   { name: "Memo", text: "TO: All Staff\nFROM: Management\nDATE: \nSUBJECT: \n\n[Body text]" }
 ];
 
-const SmartEditor: React.FC = () => {
+const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowData }) => {
   const [docs, setDocs] = useState<SavedItem[]>([]);
   const [currentDocId, setCurrentDocId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -26,6 +31,15 @@ const SmartEditor: React.FC = () => {
   useEffect(() => {
     refreshDocs();
   }, []);
+
+  useEffect(() => {
+    if (workflowData && clearWorkflowData) {
+      handleCreateNew();
+      setContent(workflowData);
+      setTitle("New Document from Workflow");
+      clearWorkflowData();
+    }
+  }, [workflowData, clearWorkflowData]);
 
   const refreshDocs = async () => {
     const items = await getSavedItems();
@@ -143,10 +157,10 @@ const SmartEditor: React.FC = () => {
   return (
     <div className="h-full flex gap-6 max-w-7xl mx-auto">
       {/* Sidebar List */}
-      <div className="w-64 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-           <h3 className="font-bold text-slate-700 text-sm uppercase">Documents</h3>
-           <button onClick={handleCreateNew} className="text-blue-600 hover:bg-blue-100 p-1.5 rounded transition-colors">
+      <div className="w-64 flex-shrink-0 flex-col bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hidden md:flex">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+           <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase">Documents</h3>
+           <button onClick={handleCreateNew} className="text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-1.5 rounded transition-colors">
               <Icons.Plus />
            </button>
         </div>
@@ -158,7 +172,7 @@ const SmartEditor: React.FC = () => {
                <button 
                   key={doc.id}
                   onClick={() => handleSelectDoc(doc)}
-                  className={`w-full text-left p-3 rounded-lg text-sm truncate transition-colors ${currentDocId === doc.id ? 'bg-blue-50 text-blue-700 font-bold border border-blue-100' : 'hover:bg-slate-50 text-slate-600'}`}
+                  className={`w-full text-left p-3 rounded-lg text-sm truncate transition-colors ${currentDocId === doc.id ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold border border-blue-100 dark:border-blue-800' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-300'}`}
                >
                    {doc.title}
                </button>
@@ -167,31 +181,31 @@ const SmartEditor: React.FC = () => {
       </div>
 
       {/* Editor Area */}
-      <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+      <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden relative">
          {/* Toolbar */}
-         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-10">
+         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 sticky top-0 z-10">
              <input 
                 type="text" 
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Untitled Document"
-                className="text-xl font-bold text-slate-800 placeholder:text-slate-300 outline-none bg-transparent"
+                className="text-xl font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-300 outline-none bg-transparent"
              />
              <div className="flex gap-2 relative">
                  <button 
                     onClick={() => setShowTemplates(!showTemplates)}
-                    className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1"
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1"
                  >
                      <Icons.Briefcase /> Templates
                  </button>
                  
                  {showTemplates && (
-                     <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-slate-200 w-48 py-1 z-30">
+                     <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-48 py-1 z-30">
                          {TEMPLATES.map(t => (
                              <button 
                                 key={t.name}
                                 onClick={() => insertTemplate(t.text)}
-                                className="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600"
+                                className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-blue-600"
                              >
                                  {t.name}
                              </button>
@@ -201,7 +215,7 @@ const SmartEditor: React.FC = () => {
 
                  <button 
                     onClick={handlePrint}
-                    className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     title="Export PDF / Print"
                  >
                     <Icons.Printer />
@@ -216,29 +230,29 @@ const SmartEditor: React.FC = () => {
          </div>
 
          {/* Text Area */}
-         <div className="flex-1 relative bg-slate-50 overflow-hidden flex flex-col">
+         <div className="flex-1 relative bg-slate-50 dark:bg-slate-900/50 overflow-hidden flex flex-col">
              <textarea 
                 ref={editorRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 onSelect={handleTextSelect}
-                className="flex-1 w-full p-8 outline-none resize-none font-serif text-lg leading-relaxed text-slate-800 bg-white shadow-inner"
+                className="flex-1 w-full p-8 outline-none resize-none font-serif text-lg leading-relaxed text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 shadow-inner"
                 placeholder="Start typing or use the AI bar below..."
              />
 
              {/* AI Bar */}
-             <div className="bg-white border-t border-slate-200 p-4 shadow-xl z-20">
+             <div className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-4 shadow-xl z-20">
                  <div className="max-w-3xl mx-auto flex flex-col gap-2">
                     {selection && (
-                         <div className="flex gap-2 pb-2 border-b border-slate-100 overflow-x-auto">
+                         <div className="flex gap-2 pb-2 border-b border-slate-100 dark:border-slate-700 overflow-x-auto">
                              <span className="text-xs font-bold text-slate-400 uppercase px-2 py-1 whitespace-nowrap">Selected:</span>
-                             <button onClick={() => { setAiPrompt("Fix grammar and spelling"); handleAiAction('rewrite'); }} className="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-full whitespace-nowrap">Fix Grammar</button>
-                             <button onClick={() => { setAiPrompt("Make it more professional"); handleAiAction('rewrite'); }} className="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-full whitespace-nowrap">Make Professional</button>
-                             <button onClick={() => { setAiPrompt("Shorten this"); handleAiAction('rewrite'); }} className="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-full whitespace-nowrap">Shorten</button>
+                             <button onClick={() => { setAiPrompt("Fix grammar and spelling"); handleAiAction('rewrite'); }} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 px-3 py-1 rounded-full whitespace-nowrap">Fix Grammar</button>
+                             <button onClick={() => { setAiPrompt("Make it more professional"); handleAiAction('rewrite'); }} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 px-3 py-1 rounded-full whitespace-nowrap">Make Professional</button>
+                             <button onClick={() => { setAiPrompt("Shorten this"); handleAiAction('rewrite'); }} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 px-3 py-1 rounded-full whitespace-nowrap">Shorten</button>
                          </div>
                      )}
                      <div className="flex items-center gap-3">
-                         <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                         <div className="p-2 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded-lg">
                              <Icons.Sparkles />
                          </div>
                          <input 

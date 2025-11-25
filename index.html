@@ -6,7 +6,18 @@
     <title>Byete Business</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Immediately-invoked function to set theme and prevent FOUC
+      (function() {
+        const theme = localStorage.getItem('byete_theme') || 'system';
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+
       tailwind.config = {
+        darkMode: 'class', // Enable dark mode
         theme: {
           extend: {
             colors: {
@@ -39,8 +50,14 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
       }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #475569;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+      }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
@@ -52,12 +69,13 @@
     "vite": "https://aistudiocdn.com/vite@^7.2.4",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
     "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
-    "remark-gfm": "https://aistudiocdn.com/remark-gfm@^4.0.1"
+    "remark-gfm": "https://aistudiocdn.com/remark-gfm@^4.0.1",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0"
   }
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-300 font-sans antialiased overflow-hidden">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

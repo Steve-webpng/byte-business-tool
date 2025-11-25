@@ -14,6 +14,8 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [volume, setVolume] = useState(0); 
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
+  const [currentUserTranscript, setCurrentUserTranscript] = useState('');
+  const [currentModelTranscript, setCurrentModelTranscript] = useState('');
   
   // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -28,7 +30,7 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
     if (transcriptRef.current) {
         transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
-  }, [transcript]);
+  }, [transcript, currentUserTranscript, currentModelTranscript]);
 
   // Cleanup function
   const stopSession = () => {
@@ -140,23 +142,28 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
                  }
              }
 
-             // Handle Transcription (if available in future/current SDK versions via explicit fields or logic)
-             // Currently relying on turnComplete for definitive text if available, or incremental updates.
-             // Note: The specific field for text transcription might vary based on API version. 
-             // We check modelTurn for text parts as fallback if audio transcription is sent as text.
-             
-             if (message.serverContent?.modelTurn?.parts) {
-                 const textPart = message.serverContent.modelTurn.parts.find(p => p.text);
-                 if (textPart && textPart.text) {
-                     setTranscript(prev => {
-                         const last = prev[prev.length - 1];
-                         if (last && last.role === 'model') {
-                             return [...prev.slice(0, -1), { ...last, text: last.text + textPart.text }];
-                         }
-                         return [...prev, { role: 'model', text: textPart.text!, timestamp: Date.now() }];
-                     });
-                 }
-             }
+             // Handle Transcription
+            if (message.serverContent?.inputTranscription) {
+                setCurrentUserTranscript(prev => prev + message.serverContent!.inputTranscription!.text);
+            }
+            if (message.serverContent?.outputTranscription) {
+                setCurrentModelTranscript(prev => prev + message.serverContent!.outputTranscription!.text);
+            }
+
+            if (message.serverContent?.turnComplete) {
+                const finalUserTurn = (currentUserTranscript + (message.serverContent?.inputTranscription?.text || '')).trim();
+                const finalModelTurn = (currentModelTranscript + (message.serverContent?.outputTranscription?.text || '')).trim();
+                
+                setTranscript(prev => {
+                    const newTurns: TranscriptItem[] = [];
+                    if (finalUserTurn) newTurns.push({ role: 'user', text: finalUserTurn, timestamp: Date.now() });
+                    if (finalModelTurn) newTurns.push({ role: 'model', text: finalModelTurn, timestamp: Date.now() });
+                    return [...prev, ...newTurns];
+                });
+
+                setCurrentUserTranscript('');
+                setCurrentModelTranscript('');
+            }
 
              if (message.serverContent?.interrupted) {
                 nextStartTimeRef.current = 0;
@@ -194,13 +201,13 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
     <div className={`h-full flex flex-col ${isWidget ? '' : 'max-w-4xl mx-auto items-center justify-center'}`}>
         {!isWidget && (
             <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-slate-800 mb-2">AI Sales Coach</h2>
-                <p className="text-slate-500">Practice your pitch or negotiation skills with real-time feedback.</p>
+                <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200 mb-2">AI Sales Coach</h2>
+                <p className="text-slate-500 dark:text-slate-400">Practice your pitch or negotiation skills with real-time feedback.</p>
             </div>
         )}
 
         {isWidget && (
-            <div className="flex items-center gap-2 mb-3 text-slate-700">
+            <div className="flex items-center gap-2 mb-3 text-slate-700 dark:text-slate-300">
                 <Icons.Mic />
                 <h3 className="font-bold text-sm uppercase tracking-wide">Live Coach</h3>
             </div>
@@ -267,29 +274,49 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
 
             {/* Transcript Panel (Only in full view) */}
             {!isWidget && (
-                <div className="flex-1 bg-white rounded-3xl shadow-lg border border-slate-200 p-6 flex flex-col overflow-hidden">
-                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 flex flex-col overflow-hidden">
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
                         <Icons.ChatBubble />
-                        <h3 className="font-bold text-slate-700 text-sm uppercase">Live Transcript</h3>
+                        <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase">Live Transcript</h3>
                     </div>
                     <div ref={transcriptRef} className="flex-1 overflow-y-auto space-y-4 pr-2">
-                        {transcript.length === 0 ? (
+                        {transcript.length === 0 && !currentUserTranscript && !currentModelTranscript ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center opacity-60">
                                 <p className="text-sm italic">Start the session and speak...</p>
                                 <p className="text-xs mt-1">Transcript will appear here.</p>
                             </div>
                         ) : (
-                            transcript.map((item, i) => (
-                                <div key={i} className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                                        item.role === 'user' 
-                                            ? 'bg-blue-100 text-blue-900 rounded-br-none' 
-                                            : 'bg-slate-100 text-slate-800 rounded-bl-none'
-                                    }`}>
-                                        {item.text}
+                            <>
+                                {transcript.map((item, i) => (
+                                    <div key={i} className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                                            item.role === 'user' 
+                                                ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/50 dark:text-blue-200 rounded-br-none' 
+                                                : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200 rounded-bl-none'
+                                        }`}>
+                                            {item.text}
+                                        </div>
                                     </div>
-                                </div>
-                            ))
+                                ))}
+                                {(currentUserTranscript || currentModelTranscript) && (
+                                    <div className="flex flex-col gap-4 opacity-60">
+                                        {currentUserTranscript && (
+                                            <div className="flex justify-end">
+                                                <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-br-none italic">
+                                                    {currentUserTranscript}...
+                                                </div>
+                                            </div>
+                                        )}
+                                        {currentModelTranscript && (
+                                            <div className="flex justify-start">
+                                                <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm bg-slate-50 text-slate-700 dark:bg-slate-700/50 dark:text-slate-300 rounded-bl-none italic">
+                                                    {currentModelTranscript}...
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

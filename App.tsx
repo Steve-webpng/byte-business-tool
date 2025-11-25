@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ContentGenerator from './components/ContentGenerator';
@@ -13,17 +13,57 @@ import SettingsView from './components/SettingsView';
 import TaskManager from './components/TaskManager';
 import BusinessAdvisor from './components/BusinessAdvisor';
 import SmartEditor from './components/SmartEditor';
+import FocusTimer from './components/FocusTimer';
 import { AppTool, ToolDefinition } from './types';
 import { Icons } from './constants';
+import { ToastProvider } from './components/ToastContainer';
+import { getTheme, Theme } from './services/settingsService';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentTool, setCurrentTool] = useState<AppTool>(AppTool.MISSION_CONTROL);
   const [selectedToolDef, setSelectedToolDef] = useState<ToolDefinition | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>(getTheme());
+  const [workflowData, setWorkflowData] = useState<string | null>(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const isDark =
+      theme === 'dark' ||
+      (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+        if (getTheme() === 'system') {
+            if (mediaQuery.matches) {
+                root.classList.add('dark');
+            } else {
+                root.classList.remove('dark');
+            }
+        }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
 
   const handleSelectTool = (tool: ToolDefinition) => {
     setSelectedToolDef(tool);
     setCurrentTool(AppTool.UNIVERSAL_TOOL);
+  };
+
+  const handleWorkflowSend = (targetTool: AppTool, data: string) => {
+    setWorkflowData(data);
+    setCurrentTool(targetTool);
+  };
+
+  const clearWorkflowData = () => {
+    setWorkflowData(null);
   };
 
   const renderTool = () => {
@@ -31,17 +71,15 @@ const App: React.FC = () => {
       case AppTool.MISSION_CONTROL:
         return <MissionControl />;
       case AppTool.ADVISOR:
-        return <BusinessAdvisor />;
+        return <BusinessAdvisor onWorkflowSend={handleWorkflowSend} />;
       case AppTool.PROJECTS:
         return <TaskManager />;
       case AppTool.DOCUMENTS:
-        return <SmartEditor />;
+        return <SmartEditor workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
+      case AppTool.FOCUS:
+        return <FocusTimer />;
       case AppTool.LIBRARY:
-        return (
-          <ToolLibrary 
-            onSelectTool={handleSelectTool} 
-          />
-        );
+        return <ToolLibrary onSelectTool={handleSelectTool} />;
       case AppTool.UNIVERSAL_TOOL:
         return selectedToolDef 
           ? <UniversalTool tool={selectedToolDef} onBack={() => setCurrentTool(AppTool.LIBRARY)} />
@@ -49,9 +87,9 @@ const App: React.FC = () => {
       case AppTool.DASHBOARD:
         return <Dashboard setTool={setCurrentTool} />;
       case AppTool.CONTENT:
-        return <ContentGenerator />;
+        return <ContentGenerator workflowData={workflowData} clearWorkflowData={clearWorkflowData} onWorkflowSend={handleWorkflowSend} />;
       case AppTool.RESEARCH:
-        return <MarketResearch />;
+        return <MarketResearch onWorkflowSend={handleWorkflowSend} />;
       case AppTool.ANALYSIS:
         return <DataAnalyzer />;
       case AppTool.COACH:
@@ -59,14 +97,14 @@ const App: React.FC = () => {
       case AppTool.DATABASE:
         return <DatabaseView />;
       case AppTool.SETTINGS:
-        return <SettingsView />;
+        return <SettingsView onThemeChange={setTheme} />;
       default:
         return <MissionControl />;
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 relative">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 relative">
       <Sidebar 
         currentTool={currentTool} 
         setTool={setCurrentTool} 
@@ -74,13 +112,12 @@ const App: React.FC = () => {
         setIsMobileOpen={setIsMobileOpen}
       />
       
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-10 flex items-center px-4 justify-between shadow-sm">
-        <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600">
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-10 flex items-center px-4 justify-between shadow-sm">
+        <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600 dark:text-slate-300">
           <Icons.Menu />
         </button>
-        <span className="font-bold text-slate-800">Byete Business</span>
-        <div className="w-8"></div> {/* Spacer */}
+        <span className="font-bold text-slate-800 dark:text-slate-200">Byete Business</span>
+        <div className="w-8"></div>
       </div>
 
       <main className="flex-1 w-full md:ml-64 p-4 md:p-6 h-screen overflow-y-auto pt-20 md:pt-6">
@@ -89,5 +126,11 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <ToastProvider>
+    <AppContent />
+  </ToastProvider>
+);
 
 export default App;

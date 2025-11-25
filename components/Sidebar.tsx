@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
@@ -30,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
     { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
     { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
     { id: AppTool.DOCUMENTS, label: 'Smart Docs', icon: Icons.DocumentText },
+    { id: AppTool.FOCUS, label: 'Focus Timer', icon: Icons.Clock },
     { id: AppTool.LIBRARY, label: 'App Library', icon: Icons.Apps },
     { id: AppTool.DASHBOARD, label: 'Dashboard', icon: Icons.Dashboard },
     { id: AppTool.CONTENT, label: 'Content Studio', icon: Icons.Pen },
@@ -66,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
             <h1 className="text-xl font-bold tracking-tight">Byete</h1>
           </div>
           <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white">
-            <Icons.X />
+            <Icons.Grid />
           </button>
         </div>
         

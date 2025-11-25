@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { analyzeData } from '../services/geminiService';
@@ -12,13 +13,22 @@ interface DataAnalyzerProps {
 }
 
 const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
+  const [mode, setMode] = useState<'ai' | 'manual'>('ai');
+  
+  // AI State
   const [prompt, setPrompt] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Manual State
+  const [manualDataInput, setManualDataInput] = useState(''); // CSV format: Label, Value
+  const [manualChartType, setManualChartType] = useState<'bar' | 'line' | 'pie'>('bar');
+  const [manualTitle, setManualTitle] = useState('');
+
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -32,7 +42,7 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyzeAI = async () => {
     if (!prompt && !file) return;
     setLoading(true);
     try {
@@ -44,6 +54,32 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleManualRender = () => {
+      if (!manualDataInput.trim()) return;
+      
+      const lines = manualDataInput.trim().split('\n');
+      const dataPoints = lines.map(line => {
+          const parts = line.split(',');
+          if (parts.length < 2) return null;
+          const val = parseFloat(parts[1].trim());
+          return {
+              name: parts[0].trim(),
+              value: isNaN(val) ? 0 : val
+          };
+      }).filter(d => d !== null) as {name: string, value: number}[];
+
+      if (dataPoints.length === 0) {
+          alert("Invalid data format. Use 'Label, Value'");
+          return;
+      }
+
+      setResult({
+          summary: manualTitle || "Manual Data Visualization",
+          type: manualChartType,
+          data: dataPoints
+      });
   };
 
   const handleSave = async () => {
@@ -121,7 +157,21 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
         <div className="flex justify-between items-end">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Data Analyzer</h2>
-            <p className="text-slate-500">Upload charts or describe data to generate instant visualization and insights.</p>
+            <p className="text-slate-500">Visualize data instantly via AI interpretation or manual input.</p>
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button 
+                  onClick={() => setMode('ai')}
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${mode === 'ai' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  AI Analysis
+              </button>
+              <button 
+                  onClick={() => setMode('manual')}
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${mode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  Manual Entry
+              </button>
           </div>
         </div>
       )}
@@ -138,45 +188,89 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
         {/* Input Section */}
         <div className={`bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 overflow-y-auto ${isWidget ? 'p-3 order-2' : 'p-6'}`}>
           
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
-              ${preview ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50'}
-              ${isWidget ? 'h-24' : 'h-48'}
-            `}
-          >
-            {preview ? (
-              <img src={preview} alt="Upload preview" className="h-full w-full object-contain rounded-lg p-2" />
-            ) : (
-              <div className="text-center p-2">
-                 <div className={`mx-auto text-slate-400 mb-2 ${isWidget ? 'h-6 w-6' : 'h-10 w-10'}`}>
-                    <Icons.Chart />
-                 </div>
-                 <p className="text-sm font-bold text-slate-600">Click to Upload Image</p>
-                 {!isWidget && <p className="text-xs text-slate-400 mt-1">Supports PNG, JPG (Charts, Tables)</p>}
-              </div>
-            )}
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-          </div>
+          {mode === 'ai' ? (
+              <>
+                <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
+                    ${preview ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50'}
+                    ${isWidget ? 'h-24' : 'h-32'}
+                    `}
+                >
+                    {preview ? (
+                    <img src={preview} alt="Upload preview" className="h-full w-full object-contain rounded-lg p-2" />
+                    ) : (
+                    <div className="text-center p-2">
+                        <div className={`mx-auto text-slate-400 mb-2 ${isWidget ? 'h-6 w-6' : 'h-8 w-8'}`}>
+                            <Icons.Chart />
+                        </div>
+                        <p className="text-sm font-bold text-slate-600">Upload Chart Image</p>
+                    </div>
+                    )}
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+                </div>
 
-          <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Instructions / Data</label>
-             <textarea 
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the data or ask specific questions about the image..."
-                className={`w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 ${isWidget ? 'h-20' : 'h-32'}`}
-             />
-          </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Instructions</label>
+                    <textarea 
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Describe the data or ask specific questions..."
+                        className={`w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 ${isWidget ? 'h-20' : 'h-32'}`}
+                    />
+                </div>
 
-          <button
-            onClick={handleAnalyze}
-            disabled={loading || (!prompt && !file)}
-            className={`mt-auto w-full py-3 rounded-lg font-bold text-white transition-all shadow-md
-                ${loading || (!prompt && !file) ? 'bg-slate-300' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'}`}
-          >
-            {loading ? 'Analyzing...' : 'Analyze Data'}
-          </button>
+                <button
+                    onClick={handleAnalyzeAI}
+                    disabled={loading || (!prompt && !file)}
+                    className={`mt-auto w-full py-3 rounded-lg font-bold text-white transition-all shadow-md
+                        ${loading || (!prompt && !file) ? 'bg-slate-300' : 'bg-purple-600 hover:bg-purple-700'}`}
+                >
+                    {loading ? 'Analyzing...' : 'AI Analyze'}
+                </button>
+              </>
+          ) : (
+              <>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Chart Title</label>
+                    <input 
+                        type="text"
+                        value={manualTitle}
+                        onChange={(e) => setManualTitle(e.target.value)}
+                        className="w-full p-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. Q1 Sales"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Chart Type</label>
+                    <select 
+                        value={manualChartType}
+                        onChange={(e) => setManualChartType(e.target.value as any)}
+                        className="w-full p-2 border border-slate-200 rounded-lg text-sm outline-none bg-white"
+                    >
+                        <option value="bar">Bar Chart</option>
+                        <option value="line">Line Chart</option>
+                        <option value="pie">Pie Chart</option>
+                    </select>
+                </div>
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data (Label, Value)</label>
+                    <textarea 
+                        value={manualDataInput}
+                        onChange={(e) => setManualDataInput(e.target.value)}
+                        placeholder="Jan, 100&#10;Feb, 150&#10;Mar, 120"
+                        className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 h-full font-mono"
+                    />
+                </div>
+                <button
+                    onClick={handleManualRender}
+                    disabled={!manualDataInput}
+                    className="mt-4 w-full py-3 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md"
+                >
+                    Render Chart
+                </button>
+              </>
+          )}
         </div>
 
         {/* Output Section */}
@@ -185,7 +279,9 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
             <>
               <div className="mb-4 flex justify-between items-start border-b border-slate-100 pb-4">
                 <div>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Insight</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        {mode === 'ai' ? 'AI Insight' : 'Chart Title'}
+                    </span>
                     <p className="text-slate-700 font-medium leading-relaxed mt-1">{result.summary}</p>
                 </div>
                 {getSupabaseConfig() && (
@@ -203,8 +299,10 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
                <div className={`bg-slate-100 rounded-full flex items-center justify-center mb-4 ${isWidget ? 'w-12 h-12' : 'w-20 h-20'}`}>
                   <Icons.Chart />
                </div>
-               <p className="font-bold text-slate-500">No analysis yet</p>
-               <p className="text-sm mt-1">Upload an image or text to begin</p>
+               <p className="font-bold text-slate-500">No chart generated</p>
+               <p className="text-sm mt-1">
+                   {mode === 'ai' ? 'Upload an image to analyze' : 'Enter data to visualize'}
+               </p>
             </div>
           )}
         </div>

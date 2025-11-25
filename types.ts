@@ -1,3 +1,4 @@
+
 import { Type } from "@google/genai";
 
 export enum AppTool {
@@ -13,7 +14,8 @@ export enum AppTool {
   UNIVERSAL_TOOL = 'UNIVERSAL_TOOL',
   DATABASE = 'DATABASE',
   SETTINGS = 'SETTINGS',
-  ADVISOR = 'ADVISOR'
+  ADVISOR = 'ADVISOR',
+  FOCUS = 'FOCUS'
 }
 
 export interface ToolDefinition {
@@ -24,6 +26,18 @@ export interface ToolDefinition {
   icon: keyof typeof import('./constants').Icons;
   systemInstruction: string;
   placeholder?: string;
+}
+
+export interface ManualInput {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'textarea';
+  placeholder?: string;
+}
+
+export interface ManualToolConfig {
+  inputs: ManualInput[];
+  execute: (values: Record<string, any>) => string;
 }
 
 export interface ChartDataPoint {
@@ -94,4 +108,12 @@ export interface TranscriptItem {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+}
+
+// Toast Notification System
+export type ToastType = 'success' | 'error' | 'info';
+export interface ToastMessage {
+  id: number;
+  message: string;
+  type: ToastType;
 }

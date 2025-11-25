@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Task } from '../types';
-import { generateProjectTasks } from '../services/geminiService';
+import { generateProjectTasks, prioritizeTasks } from '../services/geminiService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { saveItem, getSavedItems } from '../services/supabaseService';
 import { Icons } from '../constants';
@@ -58,6 +58,22 @@ const TaskManager: React.FC = () => {
     } finally {
         setLoading(false);
     }
+  };
+
+  const handlePrioritize = async () => {
+      if (tasks.length === 0) return;
+      setLoading(true);
+      try {
+          const profile = getProfile();
+          const context = formatProfileForPrompt(profile);
+          const updatedTasks = await prioritizeTasks(tasks, context);
+          setTasks(updatedTasks);
+      } catch (e) {
+          console.error(e);
+          alert("Failed to prioritize tasks");
+      } finally {
+          setLoading(false);
+      }
   };
 
   const moveTask = (taskId: string, direction: 'forward' | 'backward') => {
@@ -153,12 +169,21 @@ const TaskManager: React.FC = () => {
                 </h2>
                 <p className="text-slate-500">Manage tasks manually or let AI generate a structured plan for you.</p>
             </div>
-            <button 
-                onClick={handleManualSave} 
-                className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:bg-emerald-50 px-4 py-2 rounded-lg transition-colors border border-emerald-200"
-            >
-                <Icons.Save /> Save Board
-            </button>
+            <div className="flex gap-2">
+                 <button 
+                    onClick={handlePrioritize}
+                    disabled={loading || tasks.length === 0}
+                    className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-lg transition-colors border border-slate-200"
+                >
+                    <Icons.Scale /> AI Prioritize
+                </button>
+                <button 
+                    onClick={handleManualSave} 
+                    className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:bg-emerald-50 px-4 py-2 rounded-lg transition-colors border border-emerald-200"
+                >
+                    <Icons.Save /> Save Board
+                </button>
+            </div>
         </div>
 
         {/* Magic Input */}

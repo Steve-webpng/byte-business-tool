@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
-import { AnalysisResult, Task, ChatMessage } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 
 const getAIClient = () => {
@@ -26,7 +26,7 @@ export const generateMarketingContent = async (
   context?: string
 ): Promise<string> => {
   const ai = getAIClient();
-  const prompt = `${context || ''}\n\nWrite a ${tone} ${type} about "${topic}". Use Markdown formatting. Keep it concise but professional.`;
+  const prompt = `${context || ''}\n\nWrite a ${tone} ${type} about "${topic}". Use Markdown formatting. Use Markdown Tables for any structured data or lists of pros/cons. Keep it concise but professional.`;
   
   const response = await ai.models.generateContent({
     model: getModel(),
@@ -34,6 +34,80 @@ export const generateMarketingContent = async (
   });
   
   return response.text || "No content generated.";
+};
+
+export const generateMarketingCampaign = async (
+  topic: string,
+  tone: string,
+  context?: string
+): Promise<MarketingCampaign> => {
+  const ai = getAIClient();
+  const prompt = `
+    ${context || ''}
+    Topic: ${topic}
+    Tone: ${tone}
+    
+    Create a multi-channel marketing campaign.
+    1. An Email (Subject + Body)
+    2. A LinkedIn Post
+    3. A Twitter Thread (Array of strings)
+    
+    Return strict JSON.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: getModel(),
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          emailSubject: { type: Type.STRING },
+          emailBody: { type: Type.STRING },
+          linkedinPost: { type: Type.STRING },
+          twitterThread: { 
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["emailSubject", "emailBody", "linkedinPost", "twitterThread"]
+      }
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No campaign generated");
+  return JSON.parse(text) as MarketingCampaign;
+};
+
+// --- Image Generation ---
+export const generateImage = async (prompt: string): Promise<string> => {
+  const ai = getAIClient();
+  
+  // Use specialized image model
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: [{ text: prompt }],
+    },
+    config: {
+      imageConfig: {
+        aspectRatio: "1:1", 
+      }
+    }
+  });
+
+  // Extract image from response parts
+  if (response.candidates?.[0]?.content?.parts) {
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData && part.inlineData.data) {
+        return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+      }
+    }
+  }
+  
+  throw new Error("No image generated. Please try a different prompt.");
 };
 
 // --- Smart Doc Editor AI ---
@@ -74,12 +148,13 @@ export const runGenericTool = async (
   
   // Prepend context to the user input
   const fullContent = context ? `${context}\n\nUSER INPUT:\n${input}` : input;
+  const tableInstruction = "Use Markdown Tables for any comparisons, lists of options, or structured data.";
 
   const response = await ai.models.generateContent({
     model: getModel(),
     contents: fullContent,
     config: {
-      systemInstruction: systemInstruction,
+      systemInstruction: `${systemInstruction} ${tableInstruction}`,
     }
   });
   
@@ -125,23 +200,79 @@ export const generateProjectTasks = async (goal: string, context?: string): Prom
       id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: t.title,
       description: t.description || '',
-      priority: t.priority,
-      columnId: 'todo'
+      priority: t.priority as Task['priority'],
+      columnId: 'todo' as const
+  }));
+};
+
+export const prioritizeTasks = async (tasks: Task[], context?: string): Promise<Task[]> => {
+  const ai = getAIClient();
+  const taskList = tasks.map(t => ({ id: t.id, title: t.title, description: t.description }));
+  
+  const prompt = `
+    ${context || ''}
+    
+    Analyze these tasks and re-prioritize them based on Impact and Effort.
+    Assign 'High' priority to high-impact/low-effort tasks.
+    Assign 'Medium' to high-impact/high-effort.
+    Assign 'Low' to low-impact.
+    
+    Tasks: ${JSON.stringify(taskList)}
+    
+    Return a JSON array of objects with 'id' and 'priority' ONLY.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: getModel(),
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING },
+                priority: { type: Type.STRING, enum: ["High", "Medium", "Low"] }
+            },
+            required: ["id", "priority"]
+        }
+      }
+    }
+  });
+
+  const updates = JSON.parse(response.text || "[]");
+  const updateMap = new Map<string, Task['priority']>(updates.map((u: any) => [u.id, u.priority]));
+
+  return tasks.map(t => ({
+    ...t,
+    priority: updateMap.get(t.id) || t.priority
   }));
 };
 
 // --- Market Research with Grounding ---
-export const performMarketResearch = async (query: string, context?: string) => {
+export const performMarketResearch = async (query: string, context?: string, isDeepDive: boolean = false) => {
   const ai = getAIClient();
   
-  const prompt = context 
-    ? `${context}\n\nUsing the Google Search tool, find real-time information to answer: "${query}".\nProvide a comprehensive summary with key business insights, competitor analysis, and current market trends.` 
-    : `Using the Google Search tool, find real-time information to answer: "${query}".\nProvide a comprehensive summary with key business insights, competitor analysis, and current market trends.`;
+  let instruction = `Using the Google Search tool, find real-time information to answer: "${query}".`;
+  
+  if (isDeepDive) {
+    instruction += `
+      Provide a "Competitor Matrix" or "Data Table" comparing key entities if applicable.
+      Structure the response with:
+      1. Executive Summary
+      2. Key Market Trends
+      3. Competitive Analysis (Use a Markdown Table)
+      4. Actionable Opportunities
+    `;
+  } else {
+    instruction += `\nProvide a comprehensive summary with key business insights, competitor analysis, and current market trends. Use Markdown Tables where appropriate.`;
+  }
 
-  // Note: Grounding usually requires a specific model (like gemini-2.0-flash-exp or similar that supports tools). 
-  // We'll stick to the user preference, but ideally enforce a capable model if the user selects a basic one.
+  const prompt = context ? `${context}\n\n${instruction}` : instruction;
+
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash', // Force standard model for search compatibility if needed, or use getModel()
+    model: 'gemini-2.5-flash', 
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -173,7 +304,6 @@ export const analyzeData = async (
   const parts: any[] = [{ text: promptText }];
   
   if (imageBase64) {
-    // Determine mime type roughly or default to png/jpeg (GenAI is forgiving with base64)
     const base64Data = imageBase64.split(',')[1];
     const mimeType = imageBase64.split(';')[0].split(':')[1];
     
@@ -224,14 +354,11 @@ export const streamChat = async function* (
     systemInstruction: string
 ) {
     const ai = getAIClient();
+    const systemWithFormatting = `${systemInstruction} Use Markdown formatting for all responses. Use Tables for comparisons or lists of data.`;
     
-    // Convert generic history to SDK format
-    // Note: The SDK manages its own history if you use the same chat object, 
-    // but here we are stateless between renders, so we reconstruct or use a new chat.
-    // For simplicity, we initialize a new chat with history each time.
     const chat: Chat = ai.chats.create({
         model: getModel(),
-        config: { systemInstruction },
+        config: { systemInstruction: systemWithFormatting },
         history: history.map(h => ({
             role: h.role,
             parts: [{ text: h.text }]
@@ -247,7 +374,6 @@ export const streamChat = async function* (
 
 // --- Live API Helpers ---
 
-// Audio Utils
 export function float32ToInt16(data: Float32Array): Int16Array {
   const l = data.length;
   const int16 = new Int16Array(l);
@@ -321,6 +447,9 @@ export const connectLiveSession = async (
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
           systemInstruction: systemInstruction,
+          // Enable transcription
+          inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
+          outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
         },
       });
   } catch (error) {

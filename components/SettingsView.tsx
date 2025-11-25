@@ -5,6 +5,7 @@ import {
   getApiKey, saveApiKey, 
   getModelPreference, saveModelPreference 
 } from '../services/settingsService';
+import { getSavedItems } from '../services/supabaseService';
 
 const SettingsView: React.FC = () => {
   const [profile, setProfile] = useState<BusinessProfile>({
@@ -44,13 +45,39 @@ const SettingsView: React.FC = () => {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleExport = async () => {
+      const items = await getSavedItems();
+      const exportData = {
+          profile,
+          savedItems: items,
+          exportDate: new Date().toISOString()
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `byete-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  };
+
   return (
     <div className="h-full max-w-4xl mx-auto flex flex-col">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">Settings</h2>
-        <p className="text-slate-500">
-          Configure your business profile and AI connection settings.
-        </p>
+      <div className="mb-6 flex justify-between items-end">
+        <div>
+            <h2 className="text-3xl font-bold text-slate-800 mb-2">Settings</h2>
+            <p className="text-slate-500">
+            Configure your business profile and AI connection settings.
+            </p>
+        </div>
+        <button 
+            onClick={handleExport}
+            className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-colors"
+        >
+            <Icons.Download /> Export Data
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-6">

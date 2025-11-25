@@ -1,4 +1,5 @@
 
+
 import { ToolDefinition } from '../types';
 
 export const TOOLS: ToolDefinition[] = [
@@ -74,6 +75,44 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Briefcase',
     systemInstruction: 'You are a Strategy Consultant. Apply the Blue Ocean Strategy framework to the business described. Identify factors to Eliminate, Reduce, Raise, and Create.',
     placeholder: 'Industry and current offering...'
+  },
+
+  // --- Design & Visuals (NEW) ---
+  {
+    id: 'des-1',
+    name: 'Logo Concept Generator',
+    description: 'Brainstorm logo ideas for your brand.',
+    category: 'Design',
+    icon: 'Photo',
+    systemInstruction: 'You are a Creative Director. Describe 3 unique logo concepts for the brand described. Include details on iconography, layout, and style (e.g., Minimalist, Vintage).',
+    placeholder: 'Brand name and industry...'
+  },
+  {
+    id: 'des-2',
+    name: 'Color Palette Generator',
+    description: 'Create brand color schemes.',
+    category: 'Design',
+    icon: 'Photo',
+    systemInstruction: 'You are a Brand Designer. Suggest a 5-color palette (with Hex codes) for the brand described. Explain the psychology behind the choices.',
+    placeholder: 'Brand vibe and audience...'
+  },
+  {
+    id: 'des-3',
+    name: 'Font Pairing Advisor',
+    description: 'Choose typography for your site.',
+    category: 'Design',
+    icon: 'Photo',
+    systemInstruction: 'You are a Typographer. Suggest 3 professional font pairings (Heading + Body) for the project described. Use Google Fonts if possible.',
+    placeholder: 'Project type and style...'
+  },
+  {
+    id: 'des-4',
+    name: 'Instagram Grid Planner',
+    description: 'Plan a cohesive 9-grid layout.',
+    category: 'Design',
+    icon: 'Photo',
+    systemInstruction: 'You are a Social Media Curator. Describe a 9-post grid sequence that tells a visual story for the brand. Describe the image for each post.',
+    placeholder: 'Brand and campaign theme...'
   },
 
   // --- Calculators & Utilities (Basic) ---

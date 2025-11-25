@@ -3,6 +3,15 @@ import { Icons } from '../constants';
 import { ChatMessage } from '../types';
 import { streamChat } from '../services/geminiService';
 import { getAdvisorContext } from '../services/advisorService';
+import MarkdownRenderer from './MarkdownRenderer';
+
+const SUGGESTIONS = [
+    "Draft a marketing strategy",
+    "Analyze my project risks",
+    "Write an investor update",
+    "Suggest productivity hacks",
+    "Review my brand voice"
+];
 
 const BusinessAdvisor: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -25,11 +34,12 @@ const BusinessAdvisor: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async (e?: React.FormEvent) => {
+  const handleSend = async (e?: React.FormEvent, overrideText?: string) => {
     e?.preventDefault();
-    if (!input.trim() || loading) return;
+    const txt = overrideText || input;
+    if (!txt.trim() || loading) return;
 
-    const userMsg: ChatMessage = { role: 'user', text: input, timestamp: new Date() };
+    const userMsg: ChatMessage = { role: 'user', text: txt, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
@@ -80,12 +90,18 @@ const BusinessAdvisor: React.FC = () => {
                       </div>
                   )}
                   
-                  <div className={`max-w-[75%] rounded-2xl px-5 py-4 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
+                  <div className={`max-w-[75%] rounded-2xl px-5 py-4 text-sm leading-relaxed shadow-sm overflow-hidden ${
                       msg.role === 'user' 
                         ? 'bg-blue-600 text-white rounded-br-none' 
                         : 'bg-slate-50 text-slate-800 border border-slate-100 rounded-bl-none'
                   }`}>
-                      {msg.text}
+                      {/* User messages are text, AI messages are Markdown */}
+                      {msg.role === 'user' ? (
+                          <div className="whitespace-pre-wrap">{msg.text}</div>
+                      ) : (
+                          <MarkdownRenderer content={msg.text} />
+                      )}
+                      
                       {msg.text === '' && loading && idx === messages.length - 1 && (
                           <span className="animate-pulse">Thinking...</span>
                       )}
@@ -100,6 +116,20 @@ const BusinessAdvisor: React.FC = () => {
           ))}
           <div ref={messagesEndRef} />
       </div>
+
+      {messages.length < 3 && (
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+            {SUGGESTIONS.map(s => (
+                <button 
+                    key={s} 
+                    onClick={() => handleSend(undefined, s)}
+                    className="whitespace-nowrap px-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
+                >
+                    {s}
+                </button>
+            ))}
+        </div>
+      )}
 
       <form onSubmit={handleSend} className="relative bg-white rounded-xl shadow-lg border border-slate-200 p-2">
           <input

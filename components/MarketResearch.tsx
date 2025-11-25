@@ -4,6 +4,7 @@ import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { GroundingChunk } from '../types';
 import { Icons } from '../constants';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface MarketResearchProps {
   isWidget?: boolean;
@@ -11,9 +12,11 @@ interface MarketResearchProps {
 
 const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false }) => {
   const [query, setQuery] = useState('');
+  const [region, setRegion] = useState('Global');
   const [result, setResult] = useState<{ text: string; sources: GroundingChunk[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isDeepDive, setIsDeepDive] = useState(false);
 
   const handleResearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,8 +26,12 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false }) => 
     setResult(null);
     try {
       const profile = getProfile();
-      const context = formatProfileForPrompt(profile);
-      const data = await performMarketResearch(query, context);
+      let context = formatProfileForPrompt(profile);
+      if (region !== 'Global') {
+          context += `\nFOCUS REGION: ${region}. Prioritize data and sources relevant to this region.`;
+      }
+
+      const data = await performMarketResearch(query, context, isDeepDive);
       setResult({ text: data.text, sources: data.groundingChunks });
     } catch (err) {
       console.error(err);
@@ -36,7 +43,7 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false }) => 
   const handleSave = async () => {
     if (!result) return;
     setSaving(true);
-    const contentToSave = `QUERY: ${query}\n\nRESULT:\n${result.text}\n\nSOURCES:\n${result.sources.map(s => s.web?.uri).join('\n')}`;
+    const contentToSave = `QUERY: ${query}\nREGION: ${region}\n\nRESULT:\n${result.text}\n\nSOURCES:\n${result.sources.map(s => s.web?.uri).join('\n')}`;
     const saveRes = await saveItem('Research', query, contentToSave);
     if (saveRes.success) {
       alert("Research saved!");
@@ -63,24 +70,58 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false }) => 
       )}
 
       <form onSubmit={handleResearch} className={`relative ${isWidget ? 'mb-4' : 'mb-8'}`}>
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
-          <Icons.Search />
+        <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                <Icons.Search />
+                </div>
+                <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={isWidget ? "Research query..." : "e.g., 'Current trends in sustainable packaging for cosmetics'"}
+                className={`w-full pl-12 pr-4 rounded-full border border-slate-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none ${isWidget ? 'py-2 text-sm' : 'py-4 text-lg'}`}
+                />
+            </div>
+            
+            {!isWidget && (
+                <div className="flex items-center gap-2">
+                    <select 
+                        value={region} 
+                        onChange={(e) => setRegion(e.target.value)}
+                        className="py-4 px-6 rounded-full border border-slate-300 shadow-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 font-medium"
+                    >
+                        <option>Global</option>
+                        <option>US</option>
+                        <option>Europe</option>
+                        <option>Asia</option>
+                    </select>
+                    <button
+                        type="submit"
+                        disabled={loading || !query}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-bold disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
+                    >
+                        {loading ? 'Searching...' : 'Research'}
+                    </button>
+                </div>
+            )}
         </div>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={isWidget ? "Research query..." : "e.g., 'Current trends in sustainable packaging for cosmetics 2024'"}
-          className={`w-full pl-12 pr-4 rounded-full border border-slate-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none ${isWidget ? 'py-2 text-sm' : 'py-4 text-lg'}`}
-        />
+        
         {!isWidget && (
-          <button
-            type="submit"
-            disabled={loading || !query}
-            className="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-full font-bold disabled:opacity-50 transition-colors shadow-sm"
-          >
-            {loading ? 'Searching...' : 'Research'}
-          </button>
+            <div className="mt-3 flex justify-center">
+                 <div className="flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1">
+                     <input 
+                        type="checkbox" 
+                        id="deepDive" 
+                        checked={isDeepDive} 
+                        onChange={(e) => setIsDeepDive(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500"
+                     />
+                     <label htmlFor="deepDive" className="text-xs font-bold text-slate-600 cursor-pointer select-none">
+                         Generate Comparison Matrix Table
+                     </label>
+                 </div>
+            </div>
         )}
       </form>
 
@@ -108,10 +149,8 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false }) => 
                )}
           </div>
           
-          <div className={`prose prose-slate max-w-none prose-headings:text-slate-800 prose-p:text-slate-600 ${isWidget ? 'mb-4 text-xs' : 'mb-8'}`}>
-            <div className="whitespace-pre-wrap leading-relaxed">
-              {result.text}
-            </div>
+          <div className={`${isWidget ? 'mb-4 text-xs' : 'mb-8'}`}>
+            <MarkdownRenderer content={result.text} />
           </div>
 
           {result.sources && result.sources.length > 0 && (

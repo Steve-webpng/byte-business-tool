@@ -82,3 +82,16 @@ export interface BoardColumn {
   title: string;
   tasks: Task[];
 }
+
+export interface MarketingCampaign {
+  emailSubject: string;
+  emailBody: string;
+  linkedinPost: string;
+  twitterThread: string[];
+}
+
+export interface TranscriptItem {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
+}

@@ -5,6 +5,13 @@ import { getProfile, formatProfileForPrompt } from '../services/settingsService'
 import { saveItem, getSavedItems } from '../services/supabaseService';
 import { SavedItem } from '../types';
 
+const TEMPLATES = [
+  { name: "Meeting Notes", text: "Date:\nAttendees:\n\nAgenda:\n1.\n2.\n\nAction Items:\n- [ ] " },
+  { name: "Project Proposal", text: "# Project Title\n\n## Executive Summary\n[Brief overview]\n\n## Objectives\n- Goal 1\n- Goal 2\n\n## Timeline\n[Dates]" },
+  { name: "Invoice", text: "INVOICE #001\n\nBill To:\n[Client Name]\n\nItems:\n1. Service A - $500\n2. Service B - $200\n\nTotal: $700" },
+  { name: "Memo", text: "TO: All Staff\nFROM: Management\nDATE: \nSUBJECT: \n\n[Body text]" }
+];
+
 const SmartEditor: React.FC = () => {
   const [docs, setDocs] = useState<SavedItem[]>([]);
   const [currentDocId, setCurrentDocId] = useState<number | null>(null);
@@ -13,6 +20,7 @@ const SmartEditor: React.FC = () => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -56,6 +64,11 @@ const SmartEditor: React.FC = () => {
     } else {
       setSelection('');
     }
+  };
+
+  const insertTemplate = (text: string) => {
+      setContent(prev => prev + (prev ? "\n\n" : "") + text);
+      setShowTemplates(false);
   };
 
   const handleAiAction = async (actionType: 'write' | 'rewrite') => {
@@ -164,7 +177,28 @@ const SmartEditor: React.FC = () => {
                 placeholder="Untitled Document"
                 className="text-xl font-bold text-slate-800 placeholder:text-slate-300 outline-none bg-transparent"
              />
-             <div className="flex gap-2">
+             <div className="flex gap-2 relative">
+                 <button 
+                    onClick={() => setShowTemplates(!showTemplates)}
+                    className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1"
+                 >
+                     <Icons.Briefcase /> Templates
+                 </button>
+                 
+                 {showTemplates && (
+                     <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-slate-200 w-48 py-1 z-30">
+                         {TEMPLATES.map(t => (
+                             <button 
+                                key={t.name}
+                                onClick={() => insertTemplate(t.text)}
+                                className="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600"
+                             >
+                                 {t.name}
+                             </button>
+                         ))}
+                     </div>
+                 )}
+
                  <button 
                     onClick={handlePrint}
                     className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"

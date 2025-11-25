@@ -4,6 +4,7 @@ import { runGenericTool } from '../services/geminiService';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { Icons } from '../constants';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface UniversalToolProps {
   tool: ToolDefinition;
@@ -142,9 +143,9 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                         )}
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-slate-50 rounded-lg border border-slate-100 p-6 prose prose-slate max-w-none prose-sm leading-relaxed text-slate-800">
+                <div className="flex-1 overflow-y-auto bg-slate-50 rounded-lg border border-slate-100 p-6">
                     {output ? (
-                        <div className="whitespace-pre-wrap">{output}</div>
+                        <MarkdownRenderer content={output} />
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
                              <div className="mb-2 text-slate-300"><Icons.DocumentText /></div>

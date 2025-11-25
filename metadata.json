@@ -1,0 +1,7 @@
+{
+  "name": "Byete Business",
+  "description": "A comprehensive business support dashboard powered by Gemini. Features intelligent market research, content generation, data analysis with visualization, and real-time sales coaching via voice.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

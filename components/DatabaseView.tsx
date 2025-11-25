@@ -1,0 +1,405 @@
+import React, { useState, useEffect } from 'react';
+import { Icons } from '../constants';
+import { initSupabase, testConnection, getSavedItems, deleteItem, getSupabaseConfig, disconnectSupabase } from '../services/supabaseService';
+import { SavedItem } from '../types';
+
+const DatabaseView: React.FC = () => {
+  // Default to dashboard view (Local Mode support)
+  const [viewState, setViewState] = useState<'welcome' | 'form' | 'setup' | 'dashboard'>('dashboard');
+  const [url, setUrl] = useState(getSupabaseConfig()?.url || '');
+  const [key, setKey] = useState(getSupabaseConfig()?.key || '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [items, setItems] = useState<SavedItem[]>([]);
+  const [viewingItem, setViewingItem] = useState<SavedItem | null>(null);
+  const [isCloud, setIsCloud] = useState(false);
+
+  // Initial Data Load
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  const refreshData = async () => {
+    setLoading(true);
+    const config = getSupabaseConfig();
+    setIsCloud(!!config);
+    const data = await getSavedItems();
+    setItems(data);
+    setLoading(false);
+  };
+
+  const handleConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    
+    if (initSupabase(url, key)) {
+      try {
+        const tableExists = await testConnection();
+        if (tableExists) {
+          await refreshData();
+          setViewState('dashboard');
+        } else {
+          setViewState('setup');
+        }
+      } catch (e: any) {
+        // Distinguish between Auth error and Missing Table
+        if (e.message && (e.message.includes('42P01') || e.message.includes('not found'))) {
+            setViewState('setup');
+        } else {
+            setError(e.message || "Connection failed. Please check your URL and Key.");
+        }
+      }
+    } else {
+      setError("Invalid URL or Key format.");
+    }
+    setLoading(false);
+  };
+
+  const handleDisconnect = () => {
+    disconnectSupabase();
+    setViewState('dashboard');
+    setUrl('');
+    setKey('');
+    refreshData(); // Revert to local items
+  };
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      const success = await deleteItem(id);
+      if (success) {
+        setItems(items.filter(i => i.id !== id));
+        if (viewingItem?.id === id) setViewingItem(null);
+      }
+    }
+  };
+
+  const getProjectRef = (projectUrl: string) => {
+      // Extract 'xyz' from 'https://xyz.supabase.co'
+      try {
+          const urlObj = new URL(projectUrl);
+          return urlObj.hostname.split('.')[0];
+      } catch {
+          return null;
+      }
+  };
+
+  // --- VIEW: SETUP WIZARD ---
+  if (viewState === 'setup') {
+      const projectRef = getProjectRef(url);
+      const sqlLink = projectRef 
+        ? `https://supabase.com/dashboard/project/${projectRef}/sql/new` 
+        : 'https://supabase.com/dashboard';
+
+      return (
+        <div className="h-full flex items-center justify-center p-4">
+            <div className="bg-white max-w-2xl w-full rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col md:flex-row">
+                <div className="bg-slate-900 p-8 flex flex-col justify-between text-white md:w-1/3">
+                    <div>
+                        <div className="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center mb-6">
+                            <Icons.Database />
+                        </div>
+                        <h2 className="text-xl font-bold mb-2">Cloud Setup</h2>
+                        <p className="text-slate-400 text-sm">We connected to your project. Now let's create the storage table.</p>
+                    </div>
+                    <div className="mt-8">
+                        <div className="flex gap-2 mb-2">
+                             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-xs font-bold">1</span>
+                             <span className="text-sm">Open SQL Editor</span>
+                        </div>
+                        <div className="flex gap-2">
+                             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-700 text-xs font-bold">2</span>
+                             <span className="text-sm">Run Script</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="p-8 flex-1">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4">Run this SQL Script</h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                        Copy this code into your Supabase SQL Editor to create the required table.
+                    </p>
+                    
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-xs text-slate-700 mb-6 relative group">
+                        <pre className="whitespace-pre-wrap">
+{`create table if not exists saved_outputs (
+  id bigint generated by default as identity primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  tool_type text not null,
+  title text not null,
+  content text not null
+);`}
+                        </pre>
+                        <button 
+                             onClick={() => {
+                                 navigator.clipboard.writeText(`create table if not exists saved_outputs (
+  id bigint generated by default as identity primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  tool_type text not null,
+  title text not null,
+  content text not null
+);`);
+                                 alert("Copied to clipboard!");
+                             }}
+                             className="absolute top-2 right-2 bg-white shadow-sm border border-slate-200 text-slate-600 px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity font-bold hover:text-blue-600"
+                        >
+                            Copy
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <a 
+                            href={sqlLink} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2 transition-colors"
+                        >
+                            <Icons.Code /> Open Supabase SQL Editor
+                        </a>
+                        <button 
+                            onClick={async () => {
+                                const exists = await testConnection();
+                                if(exists) {
+                                    await refreshData();
+                                    setViewState('dashboard');
+                                } else {
+                                    alert("Table still not found. Please run the script in Supabase first.");
+                                }
+                            }}
+                            className="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-lg transition-colors"
+                        >
+                            I've Run the Script, Check Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // --- VIEW: WELCOME / LOGIN ---
+  if (viewState === 'welcome' || viewState === 'form') {
+      return (
+        <div className="h-full flex items-center justify-center p-4">
+            {viewState === 'welcome' ? (
+                <div className="text-center animate-fade-in">
+                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                        <div className="scale-150"><Icons.Database /></div>
+                    </div>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Connect Your Cloud</h1>
+                    <p className="text-slate-500 max-w-sm mx-auto mb-8">
+                        Link your Supabase account to sync your saved items across devices.
+                    </p>
+                    <div className="flex flex-col gap-4">
+                        <button 
+                            onClick={() => setViewState('form')}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl transition-all"
+                        >
+                            Connect with Supabase
+                        </button>
+                        <button 
+                            onClick={() => setViewState('dashboard')}
+                            className="text-slate-400 hover:text-slate-600 text-sm font-medium"
+                        >
+                            Continue in Local Mode
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white max-w-md w-full rounded-2xl shadow-xl border border-slate-200 p-8 animate-fade-in">
+                    <button onClick={() => setViewState('dashboard')} className="text-sm text-slate-400 hover:text-slate-600 mb-6 flex items-center gap-1">
+                        <Icons.ArrowLeft /> Cancel
+                    </button>
+                    
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center">
+                            <Icons.Database />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900">Credentials</h2>
+                            <p className="text-xs text-slate-500">Enter your project details</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleConnect} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Project URL</label>
+                            <input 
+                                type="text" 
+                                value={url}
+                                onChange={e => setUrl(e.target.value)}
+                                placeholder="https://xyz.supabase.co"
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Anon Public Key</label>
+                            <input 
+                                type="password" 
+                                value={key}
+                                onChange={e => setKey(e.target.value)}
+                                placeholder="eyJh..."
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all"
+                                required
+                            />
+                        </div>
+                        
+                        {error && (
+                            <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg border border-red-100 flex gap-2">
+                                <span>⚠️</span> {error}
+                            </div>
+                        )}
+
+                        <button 
+                            type="submit" 
+                            disabled={loading}
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-lg transition-colors flex justify-center items-center gap-2 mt-2"
+                        >
+                            {loading ? (
+                                <span className="animate-pulse">Connecting...</span>
+                            ) : (
+                                'Sign In & Connect'
+                            )}
+                        </button>
+                    </form>
+                </div>
+            )}
+        </div>
+      );
+  }
+
+  // --- VIEW: DETAIL ITEM ---
+  if (viewingItem) {
+    return (
+      <div className="h-full flex flex-col max-w-5xl mx-auto">
+        <button onClick={() => setViewingItem(null)} className="flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-4 transition-colors w-fit">
+            <Icons.ArrowLeft /> Back to Dashboard
+        </button>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 flex flex-col flex-1 overflow-hidden animate-fade-in">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-4 mb-4">
+                <div>
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-wider">{viewingItem.tool_type}</span>
+                    <h2 className="text-2xl font-bold text-slate-800 mt-2">{viewingItem.title}</h2>
+                    <p className="text-slate-400 text-sm mt-1">Saved on {new Date(viewingItem.created_at).toLocaleString()}</p>
+                </div>
+                <button 
+                    onClick={() => {
+                        navigator.clipboard.writeText(viewingItem.content);
+                        alert("Content copied!");
+                    }}
+                    className="text-xs bg-slate-50 hover:bg-slate-100 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors border border-slate-200"
+                >
+                    Copy Content
+                </button>
+            </div>
+            <div className="flex-1 overflow-y-auto prose prose-slate max-w-none">
+                <div className="whitespace-pre-wrap font-mono text-sm">{viewingItem.content}</div>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- VIEW: DASHBOARD (Hybrid) ---
+  return (
+    <div className="h-full flex flex-col max-w-6xl mx-auto">
+      <div className="mb-6 flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-800 mb-2">Saved Work</h2>
+          <div className="flex items-center gap-2">
+            {isCloud ? (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    CLOUD CONNECTED
+                </div>
+            ) : (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">
+                    <Icons.Database />
+                    LOCAL MODE
+                </div>
+            )}
+          </div>
+        </div>
+        
+        {isCloud ? (
+            <button onClick={handleDisconnect} className="text-red-500 text-sm font-medium hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
+                Disconnect Cloud
+            </button>
+        ) : (
+            <button onClick={() => setViewState('welcome')} className="bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors shadow-sm">
+                Connect Supabase
+            </button>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                <Icons.History /> Library ({items.length})
+            </h3>
+            <button onClick={refreshData} className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50 transition-colors">
+                Refresh
+            </button>
+        </div>
+        
+        {loading ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                <div className="w-8 h-8 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin mb-2"></div>
+                <p className="text-xs">Loading...</p>
+            </div>
+        ) : items.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                    <Icons.Database />
+                </div>
+                <h3 className="text-slate-600 font-bold">No Items Yet</h3>
+                <p className="mt-2 text-sm max-w-xs text-center">
+                    {isCloud ? 'Your cloud database is empty.' : 'Local storage is empty.'} Use tools to generate and save content.
+                </p>
+            </div>
+        ) : (
+            <div className="flex-1 overflow-y-auto p-2">
+                <div className="grid grid-cols-1 gap-2">
+                    {items.map(item => (
+                        <div key={item.id} className="p-4 bg-white border border-slate-100 rounded-xl hover:border-blue-300 hover:shadow-md transition-all flex items-center justify-between group cursor-pointer" onClick={() => setViewingItem(item)}>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border 
+                                        ${item.tool_type === 'Content' ? 'bg-purple-50 text-purple-600 border-purple-100' : 
+                                          item.tool_type === 'Research' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                                          'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                                        {item.tool_type}
+                                    </span>
+                                    <span className="text-xs text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <h4 className="font-bold text-slate-800 truncate pr-4 text-lg">{item.title}</h4>
+                                <p className="text-slate-400 text-xs truncate mt-0.5 font-mono opacity-70">{item.content.substring(0, 60)}...</p>
+                            </div>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity pl-4">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Delete"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                    </svg>
+                                </button>
+                                <button 
+                                    className="p-2 bg-blue-50 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-100"
+                                >
+                                    Open
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DatabaseView;

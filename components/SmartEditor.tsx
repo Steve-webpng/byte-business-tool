@@ -4,6 +4,7 @@ import { editContentWithAI } from '../services/geminiService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { saveItem, getSavedItems } from '../services/supabaseService';
 import { SavedItem } from '../types';
+import { useToast } from './ToastContainer';
 
 interface SmartEditorProps {
   workflowData?: string | null;
@@ -27,6 +28,7 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
   const [selection, setSelection] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
     refreshDocs();
@@ -66,6 +68,9 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
     const res = await saveItem('SmartDoc', docTitle, content);
     if (res.success) {
       refreshDocs();
+      toast.show("Document saved!", "success");
+    } else {
+      toast.show("Failed to save document.", "error");
     }
   };
 
@@ -122,7 +127,7 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
       setSelection('');
     } catch (e) {
       console.error(e);
-      alert("AI Error");
+      toast.show("AI action failed. Please check your API key.", "error");
     } finally {
       setLoading(false);
     }

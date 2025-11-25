@@ -1,4 +1,5 @@
 
+
 import { Type } from "@google/genai";
 
 export enum AppTool {
@@ -6,6 +7,7 @@ export enum AppTool {
   DASHBOARD = 'DASHBOARD',
   PROJECTS = 'PROJECTS',
   DOCUMENTS = 'DOCUMENTS',
+  FILE_CHAT = 'FILE_CHAT',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
   ANALYSIS = 'ANALYSIS',

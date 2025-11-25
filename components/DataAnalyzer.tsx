@@ -1,10 +1,12 @@
 
+
 import React, { useState, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { analyzeData } from '../services/geminiService';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 import { AnalysisResult } from '../types';
 import { Icons } from '../constants';
+import { useToast } from './ToastContainer';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -14,6 +16,7 @@ interface DataAnalyzerProps {
 
 const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
+  const toast = useToast();
   
   // AI State
   const [prompt, setPrompt] = useState('');
@@ -48,9 +51,10 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
     try {
       const data = await analyzeData(prompt || "Analyze this image.", preview || undefined);
       setResult(data);
+      toast.show("Analysis complete!", "success");
     } catch (err) {
       console.error(err);
-      alert("Failed to analyze data. Please try again.");
+      toast.show("Failed to analyze data. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -71,7 +75,7 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
       }).filter(d => d !== null) as {name: string, value: number}[];
 
       if (dataPoints.length === 0) {
-          alert("Invalid data format. Use 'Label, Value'");
+          toast.show("Invalid data format. Use 'Label, Value'", "error");
           return;
       }
 
@@ -89,9 +93,9 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
     const title = result.summary.substring(0, 50) + "...";
     const saveRes = await saveItem('Analysis', title, contentToSave);
     if (saveRes.success) {
-      alert("Analysis data saved!");
+      toast.show("Analysis data saved!", "success");
     } else {
-      alert("Failed to save: " + saveRes.error);
+      toast.show("Failed to save: " + saveRes.error, "error");
     }
     setSaving(false);
   };

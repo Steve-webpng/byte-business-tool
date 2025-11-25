@@ -4,11 +4,13 @@ import { generateProjectTasks, prioritizeTasks } from '../services/geminiService
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { saveItem, getSavedItems } from '../services/supabaseService';
 import { Icons } from '../constants';
+import { useToast } from './ToastContainer';
 
 const TaskManager: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -40,7 +42,11 @@ const TaskManager: React.FC = () => {
   const handleManualSave = async () => {
       const content = JSON.stringify(tasks);
       const res = await saveItem('ProjectBoard', `Project Board Snapshot - ${new Date().toLocaleTimeString()}`, content);
-      if (res.success) alert("Board saved to database history!");
+      if (res.success) {
+          toast.show("Board saved to database history!", "success");
+      } else {
+          toast.show("Failed to save board.", "error");
+      }
   };
 
   const handleGenerate = async () => {
@@ -52,9 +58,10 @@ const TaskManager: React.FC = () => {
         const newTasks = await generateProjectTasks(input, context);
         setTasks(prev => [...prev, ...newTasks]);
         setInput('');
+        toast.show("AI tasks generated!", "success");
     } catch (e) {
         console.error(e);
-        alert("Failed to generate tasks");
+        toast.show("Failed to generate tasks.", "error");
     } finally {
         setLoading(false);
     }
@@ -68,9 +75,10 @@ const TaskManager: React.FC = () => {
           const context = formatProfileForPrompt(profile);
           const updatedTasks = await prioritizeTasks(tasks, context);
           setTasks(updatedTasks);
+          toast.show("Tasks have been re-prioritized by AI.", "info");
       } catch (e) {
           console.error(e);
-          alert("Failed to prioritize tasks");
+          toast.show("Failed to prioritize tasks.", "error");
       } finally {
           setLoading(false);
       }

@@ -10,7 +10,7 @@ interface DashboardProps {
 const Widget = ({ title, desc, icon: Icon, onClick, color }: any) => (
   <div 
     onClick={onClick}
-    className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group flex flex-col justify-between h-48 relative overflow-hidden"
+    className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer group flex flex-col justify-between h-48 relative overflow-hidden"
   >
     <div className={`absolute top-0 right-0 p-16 rounded-bl-full opacity-5 ${color.replace('bg-', 'text-')}`}>
          <div className="scale-150 transform translate-x-4 -translate-y-4">
@@ -22,13 +22,13 @@ const Widget = ({ title, desc, icon: Icon, onClick, color }: any) => (
       <div className={`p-3 rounded-lg ${color} text-white shadow-sm`}>
         <Icon />
       </div>
-      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+      <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-700/50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/50 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
         <Icons.ArrowRight />
       </div>
     </div>
     <div className="relative z-10">
-      <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-blue-700 transition-colors">{title}</h3>
-      <p className="text-sm text-slate-500 leading-snug">{desc}</p>
+      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">{title}</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">{desc}</p>
     </div>
   </div>
 );
@@ -50,8 +50,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
   return (
     <div className="max-w-7xl mx-auto w-full pb-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Welcome Back</h1>
-        <p className="text-slate-500">Your AI-powered business command center is ready.</p>
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200 mb-2">Welcome Back</h1>
+        <p className="text-slate-500 dark:text-slate-400">Your AI-powered business command center is ready.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
@@ -70,11 +70,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
           onClick={() => setTool(AppTool.RESEARCH)}
         />
         <Widget 
-          title="Data Analysis" 
-          desc="Visualize data from text or uploaded images."
-          icon={Icons.Chart}
+          title="File Chat" 
+          desc="Upload a document and ask questions about its content."
+          icon={Icons.Upload}
           color="bg-emerald-500"
-          onClick={() => setTool(AppTool.ANALYSIS)}
+          onClick={() => setTool(AppTool.FILE_CHAT)}
         />
         <Widget 
           title="Sales Coach" 
@@ -94,13 +94,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
             <div className="relative z-10 max-w-lg">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold mb-6 backdrop-blur-sm">
                     <Icons.Sparkles /> 
-                    <span>POWERED BY GEMINI 2.5 FLASH</span>
+                    <span>POWERED BY GEMINI AI</span>
                 </div>
                 
                 <h3 className="text-3xl font-bold mb-4 leading-tight">Next-Gen Multimodal Intelligence</h3>
                 <p className="text-slate-300 mb-8 text-lg leading-relaxed">
                     Experience low-latency reasoning across text, audio, and vision. 
-                    Upload charts for instant analysis, practice negotiations with a real-time voice coach, 
+                    Upload documents for instant analysis, practice negotiations with a real-time voice coach, 
                     or generate live market reports grounded in Google Search.
                 </p>
                 
@@ -122,9 +122,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
         </div>
 
         {/* Recent Activity / DB Widget */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full min-h-[400px]">
-             <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center backdrop-blur-sm">
-                 <h4 className="font-bold text-slate-700 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden h-full min-h-[400px]">
+             <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center backdrop-blur-sm">
+                 <h4 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                      <Icons.History /> Recent Saved Work
                  </h4>
                  {dbConnected ? (
@@ -140,7 +140,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
                          <div 
                             key={item.id} 
                             onClick={() => setTool(AppTool.DATABASE)}
-                            className="p-4 rounded-lg border border-slate-100 hover:bg-slate-50 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all group bg-white"
+                            className="p-4 rounded-lg border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-blue-200 dark:hover:border-blue-600 hover:shadow-sm cursor-pointer transition-all group bg-white dark:bg-slate-800"
                          >
                              <div className="flex items-center justify-between mb-2">
                                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border 
@@ -151,13 +151,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
                                  </span>
                                  <span className="text-[10px] text-slate-400 font-mono">{new Date(item.created_at).toLocaleDateString()}</span>
                              </div>
-                             <p className="text-sm font-semibold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">{item.title}</p>
-                             <p className="text-xs text-slate-400 line-clamp-1 mt-1">{item.content.substring(0, 50)}...</p>
+                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{item.title}</p>
+                             <p className="text-xs text-slate-400 dark:text-slate-500 line-clamp-1 mt-1">{item.content.substring(0, 50)}...</p>
                          </div>
                      ))
                  ) : (
                      <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center opacity-60">
-                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                         <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700/50 rounded-full flex items-center justify-center mb-4">
                              <Icons.Database />
                          </div>
                          <p className="text-sm font-medium">No saved items yet.</p>
@@ -167,7 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
              </div>
              
              {recentItems.length > 0 && (
-                <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+                <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <button 
                         onClick={() => setTool(AppTool.DATABASE)}
                         className="w-full text-center text-xs font-bold text-slate-500 hover:text-blue-600 uppercase tracking-wider transition-colors py-2"

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
@@ -31,6 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
     { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
     { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
     { id: AppTool.DOCUMENTS, label: 'Smart Docs', icon: Icons.DocumentText },
+    { id: AppTool.FILE_CHAT, label: 'File Chat', icon: Icons.Upload },
     { id: AppTool.FOCUS, label: 'Focus Timer', icon: Icons.Clock },
     { id: AppTool.LIBRARY, label: 'App Library', icon: Icons.Apps },
     { id: AppTool.DASHBOARD, label: 'Dashboard', icon: Icons.Dashboard },

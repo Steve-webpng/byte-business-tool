@@ -14,6 +14,7 @@ import TaskManager from './components/TaskManager';
 import BusinessAdvisor from './components/BusinessAdvisor';
 import SmartEditor from './components/SmartEditor';
 import FocusTimer from './components/FocusTimer';
+import FileChat from './components/FileChat';
 import { AppTool, ToolDefinition } from './types';
 import { Icons } from './constants';
 import { ToastProvider } from './components/ToastContainer';
@@ -76,6 +77,8 @@ const AppContent: React.FC = () => {
         return <TaskManager />;
       case AppTool.DOCUMENTS:
         return <SmartEditor workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
+      case AppTool.FILE_CHAT:
+        return <FileChat />;
       case AppTool.FOCUS:
         return <FocusTimer />;
       case AppTool.LIBRARY:

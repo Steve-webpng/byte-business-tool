@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 import { 
@@ -6,7 +7,7 @@ import {
   getModelPreference, saveModelPreference,
   Theme, getTheme, saveTheme
 } from '../services/settingsService';
-import { getSavedItems } from '../services/supabaseService';
+import { getSavedItems, getContacts } from '../services/supabaseService';
 import { useToast } from './ToastContainer';
 
 interface SettingsViewProps {
@@ -67,9 +68,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onThemeChange }) => {
   const handleExport = async () => {
       try {
           const items = await getSavedItems();
+          const contacts = await getContacts();
           const exportData = {
               profile,
               savedItems: items,
+              contacts,
               exportDate: new Date().toISOString()
           };
           
@@ -83,6 +86,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onThemeChange }) => {
           document.body.removeChild(a);
           toast.show("Data exported successfully!", "success");
       } catch(e) {
+          console.error(e);
           toast.show("Failed to export data.", "error");
       }
   };
@@ -231,6 +235,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onThemeChange }) => {
                     </div>
                 </div>
             </div>
+        </div>
+
+        {/* Data Management Section */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">Data Management</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Download a backup of your profile, saved items, and CRM contacts.
+            </p>
+            <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-4 py-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+            >
+                <Icons.Download /> Export All Data (JSON)
+            </button>
         </div>
 
       </div>

@@ -1,5 +1,4 @@
 
-
 import { ToolDefinition } from '../types';
 
 export const TOOLS: ToolDefinition[] = [
@@ -76,8 +75,91 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Strategy Consultant. Apply the Blue Ocean Strategy framework to the business described. Identify factors to Eliminate, Reduce, Raise, and Create.',
     placeholder: 'Industry and current offering...'
   },
+  {
+    id: 'strat-adv-1',
+    name: 'PESTLE Analysis',
+    description: 'Analyze external macro factors.',
+    category: 'Strategy',
+    icon: 'Globe',
+    systemInstruction: 'You are a Strategic Analyst. Perform a PESTLE analysis (Political, Economic, Social, Technological, Legal, Environmental) for the industry or business described.',
+    placeholder: 'Industry or Business...'
+  },
+  {
+    id: 'strat-adv-2',
+    name: 'Porter\'s 5 Forces',
+    description: 'Analyze competitive intensity.',
+    category: 'Strategy',
+    icon: 'Shield',
+    systemInstruction: 'You are a Market Analyst. Conduct a Porter\'s Five Forces analysis (Supplier Power, Buyer Power, Competitive Rivalry, Threat of Substitution, Threat of New Entry) for the industry described.',
+    placeholder: 'Industry (e.g. Airline, Coffee Shop)...'
+  },
 
-  // --- Design & Visuals (NEW) ---
+  // --- Real Estate ---
+  {
+    id: 're-1',
+    name: 'Property Listing Writer',
+    description: 'Create captivating real estate listings.',
+    category: 'Real Estate',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Luxury Real Estate Agent. Write a captivating property description for a listing. Highlight key features and the lifestyle.',
+    placeholder: 'Bedrooms, bathrooms, location, and key features...'
+  },
+  {
+    id: 're-2',
+    name: 'Neighborhood Guide',
+    description: 'Generate insights about a local area.',
+    category: 'Real Estate',
+    icon: 'Search',
+    systemInstruction: 'You are a Local Guide. Write a summary of the neighborhood mentioned, highlighting amenities, schools, vibe, and pros/cons for residents.',
+    placeholder: 'Neighborhood and City name...'
+  },
+  {
+    id: 're-3',
+    name: 'Lease Summarizer',
+    description: 'Simplify complex lease agreements.',
+    category: 'Real Estate',
+    icon: 'Scale',
+    systemInstruction: 'You are a Property Manager. Summarize the key terms of a lease agreement based on the text provided. Focus on rent, term, and restrictions.',
+    placeholder: 'Paste lease text here...'
+  },
+  {
+    id: 're-calc-1',
+    name: 'Cap Rate Calculator',
+    description: 'Evaluate rental property ROI.',
+    category: 'Real Estate',
+    icon: 'Money',
+    systemInstruction: 'You are a Real Estate Investor. Calculate the Capitalization Rate (Cap Rate) based on the Net Operating Income (NOI) and Property Value provided. Explain if it is a good deal (general rule of thumb).',
+    placeholder: 'NOI: $12,000, Price: $200,000...'
+  },
+  {
+    id: 're-calc-2',
+    name: 'Cash-on-Cash Return',
+    description: 'Calculate return on cash invested.',
+    category: 'Real Estate',
+    icon: 'Money',
+    systemInstruction: 'You are a Property Investor. Calculate the Cash-on-Cash Return based on Annual Pre-Tax Cash Flow and Total Cash Invested.',
+    placeholder: 'Cash Flow: $5000, Total Cash Invested: $50,000...'
+  },
+  {
+    id: 're-4',
+    name: 'Open House Checklist',
+    description: 'Prepare for a showing.',
+    category: 'Real Estate',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Realtor. Create a checklist of tasks to prepare a home for an Open House (Cleaning, Staging, Marketing).',
+    placeholder: 'Property type...'
+  },
+  {
+    id: 're-5',
+    name: 'Rent Increase Notice',
+    description: 'Formal notice to tenants.',
+    category: 'Real Estate',
+    icon: 'DocumentText',
+    systemInstruction: 'You are a Landlord. Write a formal, legally-sound (generic) notice of rent increase to a tenant. Check local laws reminder.',
+    placeholder: 'Current rent, New rent, Effective date...'
+  },
+
+  // --- Design & Visuals ---
   {
     id: 'des-1',
     name: 'Logo Concept Generator',
@@ -113,6 +195,185 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Photo',
     systemInstruction: 'You are a Social Media Curator. Describe a 9-post grid sequence that tells a visual story for the brand. Describe the image for each post.',
     placeholder: 'Brand and campaign theme...'
+  },
+
+  // --- Social Media ---
+  {
+    id: 'soc-1',
+    name: 'LinkedIn Commenter',
+    description: 'Draft thoughtful replies to industry posts.',
+    category: 'Social Media',
+    icon: 'Megaphone',
+    systemInstruction: 'You are a Networking Expert. Draft 3 thoughtful, value-adding comments to the LinkedIn post described. Avoid generic phrases like "Great post!".',
+    placeholder: 'Post content and author...'
+  },
+  {
+    id: 'soc-2',
+    name: 'Twitter Bio Optimizer',
+    description: 'Create a high-converting profile bio.',
+    category: 'Social Media',
+    icon: 'User',
+    systemInstruction: 'You are a Personal Branding Coach. Write 3 variations of a Twitter/X bio (under 160 chars) that establishes authority and includes a call to action.',
+    placeholder: 'Your role, achievements, and goal...'
+  },
+  {
+    id: 'soc-3',
+    name: 'YouTube Chapters',
+    description: 'Generate timestamps for videos.',
+    category: 'Social Media',
+    icon: 'VideoCamera',
+    systemInstruction: 'You are a YouTube SEO Specialist. Create a list of video chapters with timestamps (00:00 Intro...) based on the video transcript or outline provided.',
+    placeholder: 'Video outline or transcript...'
+  },
+  {
+    id: 'soc-4',
+    name: 'Instagram Story Planner',
+    description: 'Sequence of engaging stories.',
+    category: 'Social Media',
+    icon: 'Photo',
+    systemInstruction: 'You are a Social Media Storyteller. Outline a 5-slide Instagram Story sequence to promote the offer or topic described. Include visual and text cues.',
+    placeholder: 'Topic or promotion...'
+  },
+  {
+    id: 'soc-5',
+    name: 'LinkedIn Post Hook Gen',
+    description: 'Stop the scroll with great hooks.',
+    category: 'Social Media',
+    icon: 'Megaphone',
+    systemInstruction: 'You are a LinkedIn Ghostwriter. Write 5 attention-grabbing opening lines (hooks) for a LinkedIn post about the topic provided. Focus on curiosity and value.',
+    placeholder: 'Post topic...'
+  },
+
+  // --- Brainstorming ---
+  {
+    id: 'brain-1',
+    name: 'Analogy Generator',
+    description: 'Explain complex ideas simply.',
+    category: 'Brainstorming',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Creative Teacher. Create 3 distinct analogies to explain the complex concept provided to a layperson.',
+    placeholder: 'Concept (e.g. Blockchain, API)...'
+  },
+  {
+    id: 'brain-2',
+    name: 'SCAMPER Ideation',
+    description: 'Innovate on existing products.',
+    category: 'Brainstorming',
+    icon: 'Sparkles',
+    systemInstruction: 'You are an Innovation Consultant. Apply the SCAMPER method (Substitute, Combine, Adapt, Modify, Put to other use, Eliminate, Reverse) to the product described.',
+    placeholder: 'Product or service...'
+  },
+  {
+    id: 'brain-3',
+    name: 'Pre-Mortem Analysis',
+    description: 'Predict and prevent failure.',
+    category: 'Brainstorming',
+    icon: 'Shield',
+    systemInstruction: 'You are a Risk Analyst. Imagine the project described has failed 6 months from now. List 5 plausible reasons why it failed and how to prevent them today.',
+    placeholder: 'Project plan...'
+  },
+  {
+    id: 'brain-4',
+    name: 'First Principles',
+    description: 'Break problems down to basics.',
+    category: 'Brainstorming',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a First Principles Thinker. Deconstruct the problem provided into its fundamental truths and build a solution up from there.',
+    placeholder: 'Problem or assumption...'
+  },
+  {
+    id: 'brain-5',
+    name: 'Five Whys',
+    description: 'Find the root cause.',
+    category: 'Brainstorming',
+    icon: 'Search',
+    systemInstruction: 'You are a Root Cause Analyst. Perform a "5 Whys" analysis on the problem described to find the underlying issue.',
+    placeholder: 'Problem statement...'
+  },
+
+  // --- E-commerce Optimization ---
+  {
+    id: 'ecom-opt-1',
+    name: 'A/B Test Ideas',
+    description: 'Experiments to boost conversion.',
+    category: 'E-commerce',
+    icon: 'Chart',
+    systemInstruction: 'You are a CRO Specialist. Suggest 3 A/B testing hypotheses for the page described (e.g. Checkout, Landing Page) to improve conversion rate.',
+    placeholder: 'Page type and current performance...'
+  },
+  {
+    id: 'ecom-opt-2',
+    name: 'Review Responder',
+    description: 'Professional replies to feedback.',
+    category: 'E-commerce',
+    icon: 'ChatBubble',
+    systemInstruction: 'You are a Customer Success Manager. Write a professional, empathetic response to the customer review provided. If negative, offer a solution.',
+    placeholder: 'Customer review text...'
+  },
+  {
+    id: 'ecom-opt-3',
+    name: 'Upsell Bundle Gen',
+    description: 'Increase average order value.',
+    category: 'E-commerce',
+    icon: 'Money',
+    systemInstruction: 'You are a Merchandiser. Suggest 3 creative product bundle ideas based on the main product to increase Average Order Value.',
+    placeholder: 'Main product...'
+  },
+  {
+    id: 'ecom-opt-4',
+    name: 'Unboxing Experience',
+    description: 'Make packaging shareable.',
+    category: 'E-commerce',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Brand Experience Designer. Brainstorm 5 low-cost ways to improve the unboxing experience for this product to encourage social sharing.',
+    placeholder: 'Product and brand vibe...'
+  },
+
+  // --- Career & Professional ---
+  {
+    id: 'car-1',
+    name: 'Resume Bullet Polish',
+    description: 'Quantify your achievements.',
+    category: 'Career',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Resume Writer. Rewrite the provided resume bullet point to be action-oriented, quantified, and impactful (Google X-Y-Z formula).',
+    placeholder: 'Draft bullet point...'
+  },
+  {
+    id: 'car-2',
+    name: 'Cover Letter Drafter',
+    description: 'Personalized application letters.',
+    category: 'Career',
+    icon: 'DocumentText',
+    systemInstruction: 'You are a Career Coach. Draft a compelling cover letter for the role and company described, highlighting the user\'s key skills.',
+    placeholder: 'Role, Company, and your top 3 skills...'
+  },
+  {
+    id: 'car-3',
+    name: 'LinkedIn About Writer',
+    description: 'Tell your professional story.',
+    category: 'Career',
+    icon: 'UserCircle',
+    systemInstruction: 'You are a Personal Branding Expert. Write a first-person LinkedIn "About" section that is engaging, professional, and highlights the user\'s unique value.',
+    placeholder: 'Your background, skills, and passion...'
+  },
+  {
+    id: 'car-4',
+    name: 'Salary Negotiation',
+    description: 'Scripts to ask for more.',
+    category: 'Career',
+    icon: 'Money',
+    systemInstruction: 'You are a Negotiation Coach. Write a script to negotiate a higher salary after receiving a job offer. Be professional, grateful, but firm.',
+    placeholder: 'Offer details and target salary...'
+  },
+  {
+    id: 'car-5',
+    name: 'Networking Outreach',
+    description: 'Coffee chat requests.',
+    category: 'Career',
+    icon: 'ChatBubble',
+    systemInstruction: 'You are a Networker. Write a short, polite LinkedIn connection request or email to ask a stranger for a virtual coffee chat.',
+    placeholder: 'Person\'s role and reason for connecting...'
   },
 
   // --- Calculators & Utilities (Basic) ---
@@ -270,6 +531,33 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Code',
     systemInstruction: 'You are a UUID Generator. Generate 5 random Version 4 UUIDs.',
     placeholder: 'Just click Run...'
+  },
+  {
+    id: 'dev-adv-1',
+    name: 'Dockerfile Generator',
+    description: 'Containerize applications.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a DevOps Engineer. Generate a Dockerfile for the application stack described. Use best practices for image size and security.',
+    placeholder: 'App stack (e.g. Node.js 18, Express, Mongodb)...'
+  },
+  {
+    id: 'dev-adv-2',
+    name: 'Kubernetes YAML',
+    description: 'Deploy to K8s.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a Cloud Engineer. Generate a basic Kubernetes Deployment and Service YAML for the application described.',
+    placeholder: 'App name, image, and port...'
+  },
+  {
+    id: 'dev-adv-3',
+    name: 'React Component Gen',
+    description: 'Scaffold UI components.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a Frontend Developer. Generate a React functional component (TypeScript) based on the description. Include props interface and basic Tailwind styling.',
+    placeholder: 'Component description (e.g. User Card with avatar)...'
   },
 
   // --- Business Math ---
@@ -808,6 +1096,15 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are an SEO Strategist. Generate a structured list of SEO keywords and Content Clusters tailored to the specific niche and target audience provided. Focus on high-intent topics.',
     placeholder: 'Niche and Target Audience...'
   },
+  {
+    id: 'mkt-adv-1',
+    name: 'Lead Magnet Ideas',
+    description: 'Incentives to capture emails.',
+    category: 'Marketing',
+    icon: 'Megaphone',
+    systemInstruction: 'You are a Growth Marketer. Brainstorm 5 high-value lead magnet ideas (e.g. Checklist, Ebook) to capture email addresses for the target audience.',
+    placeholder: 'Target audience and problem solved...'
+  },
 
   // --- Sales ---
   {
@@ -854,6 +1151,15 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Megaphone',
     systemInstruction: 'You are a Sales Rep. Write a polite but firm follow-up email to a prospect who hasn\'t responded in 3 days. Add value.',
     placeholder: 'Context of previous conversation...'
+  },
+  {
+    id: 'sales-ops-1',
+    name: 'Sales Script Builder',
+    description: 'Cold call scripts.',
+    category: 'Sales',
+    icon: 'Mic',
+    systemInstruction: 'You are a Sales Trainer. Write a cold call script including Opening, Value Prop, Qualification, and Ask for meeting.',
+    placeholder: 'Product and target persona...'
   },
 
   // --- E-commerce ---
@@ -921,35 +1227,6 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Shield',
     systemInstruction: 'You are a Security Consultant. Draft a comprehensive Password and Access Policy for employees.',
     placeholder: 'Strictness level (Medium, High, Gov)...'
-  },
-
-  // --- Real Estate ---
-  {
-    id: 're-1',
-    name: 'Property Listing Writer',
-    description: 'Create captivating real estate listings.',
-    category: 'Real Estate',
-    icon: 'Briefcase',
-    systemInstruction: 'You are a Luxury Real Estate Agent. Write a captivating property description for a listing. Highlight key features and the lifestyle.',
-    placeholder: 'Bedrooms, bathrooms, location, and key features...'
-  },
-  {
-    id: 're-2',
-    name: 'Neighborhood Guide',
-    description: 'Generate insights about a local area.',
-    category: 'Real Estate',
-    icon: 'Search',
-    systemInstruction: 'You are a Local Guide. Write a summary of the neighborhood mentioned, highlighting amenities, schools, vibe, and pros/cons for residents.',
-    placeholder: 'Neighborhood and City name...'
-  },
-  {
-    id: 're-3',
-    name: 'Lease Summarizer',
-    description: 'Simplify complex lease agreements.',
-    category: 'Real Estate',
-    icon: 'Scale',
-    systemInstruction: 'You are a Property Manager. Summarize the key terms of a lease agreement based on the text provided. Focus on rent, term, and restrictions.',
-    placeholder: 'Paste lease text here...'
   },
 
   // --- HR ---
@@ -1126,6 +1403,24 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Legal Assistant. Draft a generic End User License Agreement (EULA) template for a software application.',
     placeholder: 'Software name and type...'
   },
+  {
+    id: 'leg-adv-1',
+    name: 'MOU Template',
+    description: 'Memorandum of Understanding.',
+    category: 'Legal',
+    icon: 'Scale',
+    systemInstruction: 'You are a Legal Assistant. Draft a standard Memorandum of Understanding (MOU) between two parties for a preliminary partnership.',
+    placeholder: 'Partnership details...'
+  },
+  {
+    id: 'leg-adv-2',
+    name: 'Board Resolution',
+    description: 'Formalize board decisions.',
+    category: 'Legal',
+    icon: 'Scale',
+    systemInstruction: 'You are a Corporate Secretary. Draft a Board Resolution document to formally record a decision made by the Board of Directors.',
+    placeholder: 'Decision made...'
+  },
 
   // --- Engineering ---
   {
@@ -1246,6 +1541,24 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Money',
     systemInstruction: 'You are a Financial Analyst. Calculate the Net Present Value (NPV) given the discount rate and a series of cash flows.',
     placeholder: 'Rate: 10%, Flows: -1000, 200, 300...'
+  },
+  {
+    id: 'fin-adv-1',
+    name: 'EBITDA Calculator',
+    description: 'Earnings before interest/tax.',
+    category: 'Finance',
+    icon: 'Money',
+    systemInstruction: 'You are a Financial Analyst. Calculate EBITDA based on Net Income, Interest, Taxes, Depreciation, and Amortization provided.',
+    placeholder: 'Values...'
+  },
+  {
+    id: 'fin-adv-2',
+    name: 'DSCR Calculator',
+    description: 'Debt Service Coverage Ratio.',
+    category: 'Finance',
+    icon: 'Money',
+    systemInstruction: 'You are a Bank Underwriter. Calculate the Debt Service Coverage Ratio (DSCR) based on Net Operating Income and Total Debt Service.',
+    placeholder: 'NOI and Debt Service...'
   },
 
   // --- Product ---
@@ -1542,6 +1855,15 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Coach. Create a weekly habit tracker structure for the habits listed.',
     placeholder: 'Habits to track...'
   },
+  {
+    id: 'prod-sys-1',
+    name: 'Eisenhower Matrix',
+    description: 'Sort tasks by urgency/importance.',
+    category: 'Personal',
+    icon: 'CheckCircle',
+    systemInstruction: 'You are a Productivity Expert. Categorize the user\'s task list into the Eisenhower Matrix quadrants: Do First, Schedule, Delegate, Don\'t Do.',
+    placeholder: 'List your tasks...'
+  },
 
   // --- Creative Writing ---
   {
@@ -1597,6 +1919,24 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Pen',
     systemInstruction: 'You are a Writing Coach. Identify clichés in the text and suggest fresher, more original alternatives.',
     placeholder: 'Text to analyze...'
+  },
+  {
+    id: 'write-adv-1',
+    name: 'Book Outline Generator',
+    description: 'Structure a non-fiction book.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are an Editor. Create a comprehensive chapter outline for a non-fiction book on the topic provided.',
+    placeholder: 'Book topic...'
+  },
+  {
+    id: 'write-adv-2',
+    name: 'Character Profile Builder',
+    description: 'Deepen fictional characters.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are a Novelist. Create a deep character profile (Goals, Fears, Secrets, Flaws) for a character in the story described.',
+    placeholder: 'Story context and character role...'
   },
 
   // --- Hospitality ---
@@ -1937,6 +2277,24 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Social Media Strategist. Explain how to adapt the described viral trend to the user\'s specific niche.',
     placeholder: 'Trend description and your niche...'
   },
+  {
+    id: 'creator-adv-1',
+    name: 'Podcast Name Generator',
+    description: 'Creative show titles.',
+    category: 'Creator',
+    icon: 'Mic',
+    systemInstruction: 'You are a Creative Brand Specialist. Suggest 10 catchy, memorable, and SEO-friendly names for a podcast about the topic provided.',
+    placeholder: 'Podcast topic and vibe...'
+  },
+  {
+    id: 'creator-adv-2',
+    name: 'Patreon Tier Architect',
+    description: 'Structure membership perks.',
+    category: 'Creator',
+    icon: 'Money',
+    systemInstruction: 'You are a Membership Strategist. Suggest 3 Patreon membership tiers (Low, Mid, High) with specific perks for the creator type described.',
+    placeholder: 'Creator type (e.g. Artist, Educator)...'
+  },
 
   // --- Web3 & Tech ---
   {
@@ -2190,5 +2548,132 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Wrench',
     systemInstruction: 'You are a DMV Clerk. Draft a standard Vehicle Bill of Sale.',
     placeholder: 'Buyer/Seller names and Car details...'
+  },
+
+  // --- Music Business ---
+  {
+    id: 'music-1',
+    name: 'Song Lyric Assistant',
+    description: 'Draft lyrics based on a theme.',
+    category: 'Music',
+    icon: 'MusicNote',
+    systemInstruction: 'You are a Songwriter. Write lyrics for a song (Verse-Chorus structure) based on the theme and mood provided.',
+    placeholder: 'Theme (e.g. Heartbreak) and Genre...'
+  },
+  {
+    id: 'music-2',
+    name: 'Gig Technical Rider',
+    description: 'Stage and tech requirements.',
+    category: 'Music',
+    icon: 'MusicNote',
+    systemInstruction: 'You are a Tour Manager. Create a standard Technical Rider for a band, listing required stage gear, audio inputs, and lighting needs.',
+    placeholder: 'Band setup (e.g. 4 piece, drums, 2 guitars)...'
+  },
+  {
+    id: 'music-3',
+    name: 'Press Release (Music)',
+    description: 'Announce a new single or album.',
+    category: 'Music',
+    icon: 'Megaphone',
+    systemInstruction: 'You are a Music Publicist. Write a press release for a new music release. Include quotes and streaming links placeholders.',
+    placeholder: 'Artist and Song/Album details...'
+  },
+
+  // --- Freelancing ---
+  {
+    id: 'free-1',
+    name: 'Hourly Rate Calculator',
+    description: 'Calculate your target rate.',
+    category: 'Freelance',
+    icon: 'Money',
+    systemInstruction: 'You are a Freelance Coach. Help the user calculate their ideal hourly rate based on desired annual income and billable hours.',
+    placeholder: 'Desired Income: $80k, Billable hours/week: 25...'
+  },
+  {
+    id: 'free-2',
+    name: 'Scope Creep Email',
+    description: 'Address extra work requests.',
+    category: 'Freelance',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Professional Freelancer. Write a polite but firm email to a client explaining that a new request is out of scope and requires a budget adjustment.',
+    placeholder: 'New request details...'
+  },
+  {
+    id: 'free-3',
+    name: 'Client Onboarding Form',
+    description: 'Gather project info.',
+    category: 'Freelance',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Project Manager. Create a list of questions for a new client onboarding form to understand their project needs and style.',
+    placeholder: 'Service type (e.g. Web Design)...'
+  },
+
+  // --- Real Estate (More) ---
+  {
+    id: 're-4',
+    name: 'Open House Checklist',
+    description: 'Prepare for a showing.',
+    category: 'Real Estate',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Realtor. Create a checklist of tasks to prepare a home for an Open House (Cleaning, Staging, Marketing).',
+    placeholder: 'Property type...'
+  },
+  {
+    id: 're-5',
+    name: 'Rent Increase Notice',
+    description: 'Formal notice to tenants.',
+    category: 'Real Estate',
+    icon: 'DocumentText',
+    systemInstruction: 'You are a Landlord. Write a formal, legally-sound (generic) notice of rent increase to a tenant. Check local laws reminder.',
+    placeholder: 'Current rent, New rent, Effective date...'
+  },
+
+  // --- Language & Translation ---
+  {
+    id: 'lang-1',
+    name: 'Vocab Drill Generator',
+    description: 'Learn new words.',
+    category: 'Language',
+    icon: 'Globe',
+    systemInstruction: 'You are a Language Teacher. Generate a list of 10 useful vocabulary words/phrases for the topic provided in the target language, with translations.',
+    placeholder: 'Language and Topic (e.g. Spanish - Restaurant)...'
+  },
+  {
+    id: 'lang-2',
+    name: 'Email Translator (Professional)',
+    description: 'Translate emails for business.',
+    category: 'Language',
+    icon: 'Globe',
+    systemInstruction: 'You are a Professional Translator. Translate the provided email text into the target language, maintaining a formal business tone.',
+    placeholder: 'Target Language and Text...'
+  },
+
+  // --- Home & Lifestyle ---
+  {
+    id: 'home-1',
+    name: 'Cleaning Schedule',
+    description: 'Keep your space tidy.',
+    category: 'Lifestyle',
+    icon: 'CheckCircle',
+    systemInstruction: 'You are a Home Organizer. Create a weekly cleaning schedule broken down by day and room.',
+    placeholder: 'Home size/rooms...'
+  },
+  {
+    id: 'home-2',
+    name: 'Garden Planner',
+    description: 'What to plant and when.',
+    category: 'Lifestyle',
+    icon: 'Leaf',
+    systemInstruction: 'You are a Master Gardener. Suggest a planting schedule for the season and region provided.',
+    placeholder: 'Region/Zone and Season...'
+  },
+  {
+    id: 'home-3',
+    name: 'DIY Project Plan',
+    description: 'Steps for home improvement.',
+    category: 'Lifestyle',
+    icon: 'Hammer',
+    systemInstruction: 'You are a Contractor. Outline the steps, tools, and materials needed for the DIY project described.',
+    placeholder: 'Project (e.g. Build a bookshelf)...'
   }
 ];

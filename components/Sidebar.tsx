@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
@@ -27,21 +26,41 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
     else setModelName('Gemini AI');
   }, [currentTool]);
 
-  const navItems = [
-    { id: AppTool.MISSION_CONTROL, label: 'Mission Control', icon: Icons.Grid },
-    { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
-    { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
-    { id: AppTool.CRM, label: 'Contacts (CRM)', icon: Icons.Identification },
-    { id: AppTool.DOCUMENTS, label: 'Smart Docs', icon: Icons.DocumentText },
-    { id: AppTool.FILE_CHAT, label: 'File Chat', icon: Icons.Upload },
-    { id: AppTool.VOICE_NOTES, label: 'Voice Notes', icon: Icons.ClipboardText },
-    { id: AppTool.FOCUS, label: 'Focus Timer', icon: Icons.Clock },
-    { id: AppTool.LIBRARY, label: 'App Library', icon: Icons.Apps },
-    { id: AppTool.DASHBOARD, label: 'Dashboard', icon: Icons.Dashboard },
-    { id: AppTool.CONTENT, label: 'Content Studio', icon: Icons.Pen },
-    { id: AppTool.RESEARCH, label: 'Market Research', icon: Icons.Search },
-    { id: AppTool.ANALYSIS, label: 'Data Analysis', icon: Icons.Chart },
-    { id: AppTool.COACH, label: 'Sales Coach (Live)', icon: Icons.Mic },
+  const navGroups = [
+    {
+      title: 'Overview',
+      items: [
+        { id: AppTool.MISSION_CONTROL, label: 'Mission Control', icon: Icons.Grid },
+        { id: AppTool.DASHBOARD, label: 'Dashboard', icon: Icons.Dashboard },
+      ]
+    },
+    {
+      title: 'Management',
+      items: [
+        { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
+        { id: AppTool.CRM, label: 'Contacts (CRM)', icon: Icons.Identification },
+        { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
+      ]
+    },
+    {
+      title: 'Creation',
+      items: [
+        { id: AppTool.DOCUMENTS, label: 'Smart Docs', icon: Icons.DocumentText },
+        { id: AppTool.CONTENT, label: 'Content Studio', icon: Icons.Pen },
+        { id: AppTool.VOICE_NOTES, label: 'Voice Notes', icon: Icons.ClipboardText },
+      ]
+    },
+    {
+      title: 'Analysis & Tools',
+      items: [
+        { id: AppTool.RESEARCH, label: 'Market Research', icon: Icons.Search },
+        { id: AppTool.ANALYSIS, label: 'Data Analysis', icon: Icons.Chart },
+        { id: AppTool.FILE_CHAT, label: 'File Chat', icon: Icons.Upload },
+        { id: AppTool.COACH, label: 'Sales Coach', icon: Icons.Mic },
+        { id: AppTool.FOCUS, label: 'Focus Timer', icon: Icons.Clock },
+        { id: AppTool.LIBRARY, label: 'App Library', icon: Icons.Apps },
+      ]
+    }
   ];
 
   const handleNavClick = (toolId: AppTool) => {
@@ -54,83 +73,112 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setIsMobileOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar Content */}
       <aside className={`
-        fixed top-0 left-0 h-screen w-64 bg-slate-900 text-white shadow-xl z-30 flex flex-col transition-transform duration-300
+        fixed top-0 left-0 h-screen w-72 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+        {/* Header */}
+        <div className="p-6 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/50 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg text-white transform transition-transform hover:scale-105">
                 <span className="font-bold text-lg">B</span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight">Byete</h1>
+            <div className="flex flex-col justify-center">
+                <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight leading-none">Byete</h1>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mt-0.5 opacity-90">Business OS</span>
+            </div>
           </div>
-          <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white">
-            <Icons.Grid />
+          <button 
+            onClick={() => setIsMobileOpen(false)} 
+            className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Close sidebar"
+          >
+            <Icons.X />
           </button>
         </div>
         
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto custom-scrollbar">
-          {navItems.map((item) => {
-            const isActive = currentTool === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNavClick(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-200
-                  ${isActive 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-              >
-                <item.icon />
-                {item.label}
-              </button>
-            );
-          })}
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-8 custom-scrollbar">
+          {navGroups.map((group, idx) => (
+            <div key={idx}>
+              <h3 className="px-4 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 select-none">
+                {group.title}
+              </h3>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = currentTool === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavClick(item.id)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 group relative outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                        ${isActive 
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' 
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
+                        }`}
+                    >
+                      {isActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-blue-600 dark:bg-blue-400 rounded-r-full" />
+                      )}
+                      <span className={`transition-colors ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`}>
+                        <item.icon />
+                      </span>
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-2">
+        {/* Footer Actions */}
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-1 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
           <button
               onClick={() => handleNavClick(AppTool.DATABASE)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-200
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
                   ${currentTool === AppTool.DATABASE
-                    ? 'bg-emerald-600 text-white shadow-lg' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 shadow-sm' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-emerald-600 dark:hover:text-emerald-400'
                   }`}
           >
-              <Icons.Database />
-              Database
+              <span className={currentTool === AppTool.DATABASE ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-500'}>
+                <Icons.Database />
+              </span>
+              Data Management
           </button>
 
           <button
               onClick={() => handleNavClick(AppTool.SETTINGS)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-200
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-500
                   ${currentTool === AppTool.SETTINGS
-                    ? 'bg-slate-700 text-white' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                   }`}
           >
-              <Icons.Cog />
+              <span className={currentTool === AppTool.SETTINGS ? 'text-slate-900 dark:text-white' : 'text-slate-400'}>
+                <Icons.Cog />
+              </span>
               Settings
           </button>
 
-          <div className={`rounded-lg p-4 mt-2 transition-colors ${hasKey ? 'bg-slate-800' : 'bg-red-900/20 border border-red-800'}`}>
-              <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-2 h-2 rounded-full animate-pulse ${hasKey ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className={`text-[10px] font-bold uppercase ${hasKey ? 'text-slate-400' : 'text-red-400'}`}>
-                      System Status
+          {/* Status Indicator */}
+          <div className="mt-2 px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full shadow-sm transition-colors ${hasKey ? 'bg-emerald-500 shadow-emerald-200 dark:shadow-emerald-900' : 'bg-red-500 animate-pulse'}`}></div>
+                  <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 truncate max-w-[120px]">
+                      {hasKey ? modelName : 'API Key Required'}
                   </span>
               </div>
-              <div className={`text-xs ${hasKey ? 'text-slate-300' : 'text-red-300 font-bold'}`}>
-                  {hasKey ? `${modelName} Active` : 'API Key Missing'}
-              </div>
+              {hasKey && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 tracking-wide">ONLINE</span>}
           </div>
         </div>
       </aside>

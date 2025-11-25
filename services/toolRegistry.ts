@@ -122,6 +122,246 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Placeholder Text Generator. Generate "Lorem Ipsum" style placeholder text for the number of paragraphs requested.',
     placeholder: 'Number of paragraphs...'
   },
+  {
+    id: 'util-6',
+    name: 'Slug Generator',
+    description: 'Make strings URL-friendly.',
+    category: 'Utilities',
+    icon: 'Code',
+    systemInstruction: 'You are a Slug Generator. Convert the provided text into a clean, URL-friendly slug (lowercase, hyphens, no special chars).',
+    placeholder: 'Text to slugify...'
+  },
+  {
+    id: 'util-7',
+    name: 'Markdown Table Builder',
+    description: 'Convert CSV/List to Markdown Table.',
+    category: 'Utilities',
+    icon: 'Code',
+    systemInstruction: 'You are a Markdown Helper. Convert the provided comma-separated data or list into a properly formatted Markdown table.',
+    placeholder: 'Paste CSV or list data...'
+  },
+
+  // --- Developer Tools (Utilities) ---
+  {
+    id: 'dev-1',
+    name: 'JSON Prettifier',
+    description: 'Format and indent JSON.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a JSON Formatter. Take the input JSON string and output it properly indented with 2 spaces. If invalid, explain the error.',
+    placeholder: 'Paste minified JSON...'
+  },
+  {
+    id: 'dev-2',
+    name: 'JSON to CSV',
+    description: 'Convert JSON objects to CSV.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a Data Converter. Convert the provided JSON array of objects into a standard CSV format.',
+    placeholder: 'Paste JSON array...'
+  },
+  {
+    id: 'dev-3',
+    name: 'Regex Generator',
+    description: 'Create regular expressions.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a Regex Expert. Generate a Regular Expression for the pattern described. Explain the breakdown.',
+    placeholder: 'What pattern do you need to match?'
+  },
+  {
+    id: 'dev-4',
+    name: 'Cron Expression Gen',
+    description: 'Schedule cron jobs easily.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a DevOps Tool. Generate the standard Cron expression for the schedule described (e.g., "Every Monday at 9am").',
+    placeholder: 'Describe the schedule...'
+  },
+  {
+    id: 'dev-5',
+    name: 'Base64 Encoder/Decoder',
+    description: 'Encode or decode strings.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are an Encoder Tool. If the input appears to be Base64, decode it to text. If it is text, encode it to Base64. Label the output.',
+    placeholder: 'Text or Base64 string...'
+  },
+  {
+    id: 'dev-6',
+    name: 'SQL Formatter',
+    description: 'Beautify SQL queries.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a SQL Formatter. Format the provided SQL query with proper indentation and line breaks for readability.',
+    placeholder: 'Paste raw SQL...'
+  },
+  {
+    id: 'dev-7',
+    name: 'CSS Flexbox Helper',
+    description: 'Generate Flexbox code.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a CSS Helper. Generate the CSS code for a Flexbox container based on the desired layout description (e.g., "Center items horizontally and vertically").',
+    placeholder: 'Describe layout...'
+  },
+  {
+    id: 'dev-8',
+    name: 'Tailwind Class Finder',
+    description: 'Find classes for styles.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a Tailwind CSS Expert. Suggest the best Tailwind utility classes to achieve the visual style described.',
+    placeholder: 'Describe the style (e.g. dark card with shadow)...'
+  },
+  {
+    id: 'dev-9',
+    name: 'Git Ignore Generator',
+    description: 'Create .gitignore files.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a Git Expert. Generate a standard .gitignore file for the programming language or framework specified.',
+    placeholder: 'Language/Framework (e.g. Node.js, Python)...'
+  },
+  {
+    id: 'dev-10',
+    name: 'UUID Generator',
+    description: 'Generate unique IDs.',
+    category: 'Developer Tools',
+    icon: 'Code',
+    systemInstruction: 'You are a UUID Generator. Generate 5 random Version 4 UUIDs.',
+    placeholder: 'Just click Run...'
+  },
+
+  // --- Business Math ---
+  {
+    id: 'bmath-1',
+    name: 'Discount Calculator',
+    description: 'Calculate sale price.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Calculator. Calculate the final price and the amount saved given the Original Price and Discount Percentage.',
+    placeholder: 'Original Price: $50, Discount: 20%...'
+  },
+  {
+    id: 'bmath-2',
+    name: 'Sales Tax Calculator',
+    description: 'Calculate final total with tax.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Calculator. Calculate the Tax Amount and Final Total given the Subtotal and Tax Rate.',
+    placeholder: 'Subtotal: $100, Tax Rate: 8.5%...'
+  },
+  {
+    id: 'bmath-3',
+    name: 'Commission Calculator',
+    description: 'Calculate sales commission.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Calculator. Calculate the Commission Amount given the Total Sales and Commission Percentage.',
+    placeholder: 'Sales: $10,000, Rate: 5%...'
+  },
+  {
+    id: 'bmath-4',
+    name: 'Margin vs Markup',
+    description: 'Convert margin to markup.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Business Calculator. Explain the difference between Margin and Markup for the cost/price provided, and calculate both percentages.',
+    placeholder: 'Cost: $10, Price: $15...'
+  },
+  {
+    id: 'bmath-5',
+    name: 'ROI Calculator',
+    description: 'Return on Investment.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Financial Calculator. Calculate the ROI percentage given the Initial Investment and Final Value. Formula: (Final - Initial) / Initial * 100.',
+    placeholder: 'Invested: $1000, Returned: $1500...'
+  },
+  {
+    id: 'bmath-6',
+    name: 'CAGR Calculator',
+    description: 'Compound Annual Growth Rate.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Financial Analyst. Calculate the CAGR given the Start Value, End Value, and Number of Years.',
+    placeholder: 'Start: $100, End: $200, Years: 5...'
+  },
+  {
+    id: 'bmath-7',
+    name: 'Salary Converter',
+    description: 'Hourly to Yearly / Yearly to Hourly.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are a Salary Calculator. Convert the provided pay rate (Hourly or Yearly) into the other format, assuming 40 hours/week and 52 weeks/year.',
+    placeholder: 'e.g. $50/hour or $100,000/year...'
+  },
+  {
+    id: 'bmath-8',
+    name: 'Inflation Adjuster',
+    description: 'Estimate buying power.',
+    category: 'Business Math',
+    icon: 'Money',
+    systemInstruction: 'You are an Economist. Estimate the future value of money or past value based on an average inflation rate (e.g. 3%). This is an estimation.',
+    placeholder: 'Amount: $1000, Years: 10...'
+  },
+
+  // --- Office Utilities ---
+  {
+    id: 'off-1',
+    name: 'Email Signature Gen',
+    description: 'Create professional signatures.',
+    category: 'Office Utils',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Designer. Create a text-based (or HTML compatible) email signature template based on the user\'s details.',
+    placeholder: 'Name, Title, Company, Contact info...'
+  },
+  {
+    id: 'off-2',
+    name: 'Meeting Minutes Tmpl',
+    description: 'Standard notes format.',
+    category: 'Office Utils',
+    icon: 'Briefcase',
+    systemInstruction: 'You are an Admin Assistant. Generate a Meeting Minutes template structure including Attendees, Agenda, Discussion, Action Items, and Next Meeting.',
+    placeholder: 'Meeting type...'
+  },
+  {
+    id: 'off-3',
+    name: 'Timesheet Template',
+    description: 'Weekly hours tracker.',
+    category: 'Office Utils',
+    icon: 'Briefcase',
+    systemInstruction: 'You are an Office Manager. Create a Markdown table template for a Weekly Timesheet including Day, Start Time, End Time, Break, and Total Hours.',
+    placeholder: 'Just click Run...'
+  },
+  {
+    id: 'off-4',
+    name: 'PTO Request Email',
+    description: 'Ask for time off.',
+    category: 'Office Utils',
+    icon: 'Briefcase',
+    systemInstruction: 'You are an Employee. Write a polite and professional email requesting Paid Time Off (PTO) for the dates specified.',
+    placeholder: 'Dates and reason (optional)...'
+  },
+  {
+    id: 'off-5',
+    name: 'Out of Office Reply',
+    description: 'Auto-responder message.',
+    category: 'Office Utils',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Professional. Write an Out of Office (OOO) auto-reply email. Include dates of absence and who to contact in emergencies.',
+    placeholder: 'Dates and backup contact...'
+  },
+  {
+    id: 'off-6',
+    name: 'Memo Format',
+    description: 'Internal business memo.',
+    category: 'Office Utils',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Manager. Format the provided text into a standard Business Memo format (To, From, Date, Subject).',
+    placeholder: 'Subject and message...'
+  },
 
   // --- Calculators (Business) ---
   {
@@ -829,6 +1069,24 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Lawyer. Draft a simple Affiliate Marketing Agreement template defining commission rates and promotional rules.',
     placeholder: 'Commission structure...'
   },
+  {
+    id: 'leg-10',
+    name: 'Cookie Policy Generator',
+    description: 'Draft a standard cookie policy.',
+    category: 'Legal',
+    icon: 'Scale',
+    systemInstruction: 'You are a Compliance Officer. Draft a standard Cookie Policy explanation for a website, categorizing Essential, Analytics, and Marketing cookies.',
+    placeholder: 'Website details...'
+  },
+  {
+    id: 'leg-11',
+    name: 'EULA Generator',
+    description: 'End User License Agreement.',
+    category: 'Legal',
+    icon: 'Scale',
+    systemInstruction: 'You are a Legal Assistant. Draft a generic End User License Agreement (EULA) template for a software application.',
+    placeholder: 'Software name and type...'
+  },
 
   // --- Engineering ---
   {
@@ -940,6 +1198,15 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Money',
     systemInstruction: 'You are a Valuation Analyst. Explain the steps to perform a Discounted Cash Flow (DCF) analysis for the company described, listing required inputs.',
     placeholder: 'Company details...'
+  },
+  {
+    id: 'fin-7',
+    name: 'NPV Calculator',
+    description: 'Net Present Value.',
+    category: 'Finance',
+    icon: 'Money',
+    systemInstruction: 'You are a Financial Analyst. Calculate the Net Present Value (NPV) given the discount rate and a series of cash flows.',
+    placeholder: 'Rate: 10%, Flows: -1000, 200, 300...'
   },
 
   // --- Product ---
@@ -1264,6 +1531,33 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Pen',
     systemInstruction: 'You are a Poet. Write a poem in the style requested about the topic provided.',
     placeholder: 'Topic and style (e.g. Haiku about coding)...'
+  },
+  {
+    id: 'write-4',
+    name: 'Headline Analyzer',
+    description: 'Evaluate title impact.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are a Copy Editor. Analyze the headline provided for emotional impact, clarity, and click-through potential. Suggest improvements.',
+    placeholder: 'Headline...'
+  },
+  {
+    id: 'write-5',
+    name: 'Passive Voice Detector',
+    description: 'Improve writing directness.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are a Writing Coach. Identify passive voice usage in the text and rewrite sentences to be in active voice.',
+    placeholder: 'Text to analyze...'
+  },
+  {
+    id: 'write-6',
+    name: 'Cliché Finder',
+    description: 'Remove overused phrases.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are a Writing Coach. Identify clichés in the text and suggest fresher, more original alternatives.',
+    placeholder: 'Text to analyze...'
   },
 
   // --- Hospitality ---

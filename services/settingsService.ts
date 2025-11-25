@@ -6,15 +6,33 @@ export interface BusinessProfile {
   description: string;
 }
 
-const KEY = 'byete_business_profile';
+const PROFILE_KEY = 'byete_business_profile';
+const API_KEY_STORAGE = 'byete_ai_key';
+const MODEL_KEY = 'byete_ai_model';
 
 export const getProfile = (): BusinessProfile | null => {
-  const data = localStorage.getItem(KEY);
+  const data = localStorage.getItem(PROFILE_KEY);
   return data ? JSON.parse(data) : null;
 };
 
 export const saveProfile = (profile: BusinessProfile) => {
-  localStorage.setItem(KEY, JSON.stringify(profile));
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+};
+
+export const getApiKey = (): string | null => {
+  return localStorage.getItem(API_KEY_STORAGE);
+};
+
+export const saveApiKey = (key: string) => {
+  localStorage.setItem(API_KEY_STORAGE, key);
+};
+
+export const getModelPreference = (): string => {
+  return localStorage.getItem(MODEL_KEY) || 'gemini-2.5-flash';
+};
+
+export const saveModelPreference = (model: string) => {
+  localStorage.setItem(MODEL_KEY, model);
 };
 
 export const formatProfileForPrompt = (profile: BusinessProfile | null): string => {

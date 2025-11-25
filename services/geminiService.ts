@@ -1,11 +1,21 @@
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult, Task, ChatMessage } from "../types";
+import { getApiKey, getModelPreference } from "./settingsService";
 
 const getAIClient = () => {
-  if (!process.env.API_KEY) {
-    throw new Error("API Key not found");
-  }
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // 1. Try User Setting
+  const userKey = getApiKey();
+  if (userKey) return new GoogleGenAI({ apiKey: userKey });
+
+  // 2. Try Environment Variable (Fallback)
+  const envKey = process.env.API_KEY;
+  if (envKey) return new GoogleGenAI({ apiKey: envKey });
+
+  throw new Error("API Key missing. Please configure it in Settings.");
+};
+
+const getModel = () => {
+  return getModelPreference();
 };
 
 // --- Content Generation ---
@@ -19,7 +29,7 @@ export const generateMarketingContent = async (
   const prompt = `${context || ''}\n\nWrite a ${tone} ${type} about "${topic}". Use Markdown formatting. Keep it concise but professional.`;
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: getModel(),
     contents: prompt,
   });
   
@@ -47,7 +57,7 @@ export const editContentWithAI = async (
   `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: getModel(),
     contents: prompt,
   });
   
@@ -66,7 +76,7 @@ export const runGenericTool = async (
   const fullContent = context ? `${context}\n\nUSER INPUT:\n${input}` : input;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: getModel(),
     contents: fullContent,
     config: {
       systemInstruction: systemInstruction,
@@ -89,7 +99,7 @@ export const generateProjectTasks = async (goal: string, context?: string): Prom
   `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: getModel(),
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -128,8 +138,10 @@ export const performMarketResearch = async (query: string, context?: string) => 
     ? `${context}\n\nUsing the Google Search tool, find real-time information to answer: "${query}".\nProvide a comprehensive summary with key business insights, competitor analysis, and current market trends.` 
     : `Using the Google Search tool, find real-time information to answer: "${query}".\nProvide a comprehensive summary with key business insights, competitor analysis, and current market trends.`;
 
+  // Note: Grounding usually requires a specific model (like gemini-2.0-flash-exp or similar that supports tools). 
+  // We'll stick to the user preference, but ideally enforce a capable model if the user selects a basic one.
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash', // Force standard model for search compatibility if needed, or use getModel()
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -174,7 +186,7 @@ export const analyzeData = async (
   }
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: getModel(),
     contents: { parts },
     config: {
       responseMimeType: "application/json",
@@ -218,7 +230,7 @@ export const streamChat = async function* (
     // but here we are stateless between renders, so we reconstruct or use a new chat.
     // For simplicity, we initialize a new chat with history each time.
     const chat: Chat = ai.chats.create({
-        model: 'gemini-2.5-flash',
+        model: getModel(),
         config: { systemInstruction },
         history: history.map(h => ({
             role: h.role,

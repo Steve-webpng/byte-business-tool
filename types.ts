@@ -8,6 +8,8 @@ export enum AppTool {
   PROJECTS = 'PROJECTS',
   DOCUMENTS = 'DOCUMENTS',
   FILE_CHAT = 'FILE_CHAT',
+  VOICE_NOTES = 'VOICE_NOTES',
+  CRM = 'CRM',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
   ANALYSIS = 'ANALYSIS',
@@ -118,4 +120,26 @@ export interface ToastMessage {
   id: number;
   message: string;
   type: ToastType;
+}
+
+// Voice Notes
+export interface TranscribedNote {
+    id: number;
+    createdAt: string;
+    summary: string;
+    transcription: string;
+    actionItems: string[];
+}
+
+// CRM
+export type ContactStatus = 'Lead' | 'Contacted' | 'Customer' | 'Archived';
+export interface Contact {
+  id?: number;
+  created_at?: string;
+  name: string;
+  email: string;
+  company: string;
+  role: string;
+  status: ContactStatus;
+  notes: string;
 }

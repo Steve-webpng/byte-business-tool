@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign } from "../types";
+// FIX: Added 'Contact' to type imports for use in new functions.
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 
 const getAIClient = () => {
@@ -250,6 +251,67 @@ export const prioritizeTasks = async (tasks: Task[], context?: string): Promise<
   }));
 };
 
+// FIX: Added function to generate insights for a CRM contact.
+export const generateContactInsights = async (contact: Contact): Promise<string> => {
+    const ai = getAIClient();
+    const prompt = `
+      Analyze this contact and provide strategic outreach advice.
+      - Suggest 3 personalized conversation starters based on their role and company.
+      - Identify potential business needs we can solve for them.
+      - Recommend a clear next action (e.g., email draft, connect on LinkedIn with a message).
+      
+      Contact Details:
+      Name: ${contact.name}
+      Company: ${contact.company}
+      Role: ${contact.role}
+      Status: ${contact.status}
+      Notes: ${contact.notes}
+      
+      Format the output in clean, actionable Markdown. Be concise and direct.
+    `;
+    
+    const response = await ai.models.generateContent({
+      model: getModel(),
+      contents: prompt,
+    });
+    
+    return response.text || "No insights generated.";
+};
+  
+// FIX: Added function to discover leads using Google Search grounding.
+export const discoverLeads = async (query: string): Promise<{ name: string; role: string; company: string; }[]> => {
+    const ai = getAIClient();
+    const prompt = `
+      Using Google Search, identify potential business leads that match the following criteria: "${query}".
+      For each lead, provide their full name, their job title or role, and the company they work for.
+      Present the results as a clean JSON array of objects, each with "name", "role", and "company" properties.
+      Example: [{ "name": "Jane Smith", "role": "VP of Engineering", "company": "Tech Solutions Inc." }]
+      Return ONLY the JSON array. Do not include any introductory text, explanations, or markdown formatting like \`\`\`json.
+    `;
+  
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview', // Pro model for better adherence to JSON format with search
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+  
+    const text = response.text?.trim();
+    if (!text) return [];
+  
+    try {
+      const leads = JSON.parse(text);
+      if (Array.isArray(leads)) {
+          return leads;
+      }
+      return [];
+    } catch (e) {
+      console.error("Failed to parse leads JSON from model response:", text, e);
+      return [];
+    }
+};
+
 // --- Market Research with Grounding ---
 export const performMarketResearch = async (query: string, context?: string, isDeepDive: boolean = false) => {
   const ai = getAIClient();
@@ -372,6 +434,60 @@ export const streamChat = async function* (
     }
 };
 
+// FIX: Added function to transcribe and summarize audio files.
+export const transcribeAndSummarizeAudio = async (
+    base64Audio: string
+  ): Promise<{ summary: string; transcription: string; actionItems: string[] }> => {
+    const ai = getAIClient();
+    
+    const audioData = base64Audio.split(',')[1];
+    const mimeType = base64Audio.split(';')[0].split(':')[1] || 'audio/webm';
+  
+    const audioPart = {
+      inlineData: {
+        mimeType,
+        data: audioData,
+      },
+    };
+    
+    const textPart = {
+      text: `
+        Transcribe the attached audio accurately. After transcribing, analyze the content and perform the following actions:
+        1. Create a concise, one-sentence summary of the transcription's main topic.
+        2. Extract a list of any clear action items or tasks mentioned (e.g., "I need to call John," "send the report by Friday").
+        
+        Return a valid JSON object with three keys: "transcription" (the full text), "summary" (the one-sentence summary), and "actionItems" (an array of strings for tasks). If no action items are found, return an empty array.
+      `,
+    };
+  
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview', // Pro model is needed for audio file processing
+      contents: { parts: [audioPart, textPart] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING },
+            transcription: { type: Type.STRING },
+            actionItems: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ["summary", "transcription", "actionItems"],
+        },
+      },
+    });
+  
+    const jsonText = response.text;
+    if (!jsonText) {
+      throw new Error("No response from AI for audio processing.");
+    }
+    
+    return JSON.parse(jsonText);
+};
+
 // --- Live API Helpers ---
 
 export function float32ToInt16(data: Float32Array): Int16Array {
@@ -448,8 +564,9 @@ export const connectLiveSession = async (
           },
           systemInstruction: systemInstruction,
           // Enable transcription
-          inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
-          outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
+// FIX: Removed invalid 'model' property from transcription configs.
+          inputAudioTranscription: { },
+          outputAudioTranscription: { },
         },
       });
   } catch (error) {

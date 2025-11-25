@@ -1,9 +1,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SavedItem } from '../types';
+import { SavedItem, Contact } from '../types';
 
 let supabase: SupabaseClient | null = null;
 let currentConfig: { url: string; key: string } | null = null;
-const LOCAL_STORAGE_KEY = 'byete_saved_items';
+const LOCAL_STORAGE_KEY_SAVED_ITEMS = 'byete_saved_items';
+const LOCAL_STORAGE_KEY_CONTACTS = 'byete_contacts';
 
 // Initialize Supabase with user credentials
 export const initSupabase = (url: string, key: string) => {
@@ -24,59 +25,42 @@ export const disconnectSupabase = () => {
   currentConfig = null;
 };
 
-// Test connection by fetching a single item or checking health
-export const testConnection = async (): Promise<boolean> => {
-  if (!supabase) return true; // Local mode is always "connected" in a way, but this function is for Cloud.
+// Test connection by checking for a specific table
+export const testConnection = async (tableName: 'saved_outputs' | 'contacts'): Promise<boolean> => {
+  if (!supabase) return true; // Local mode is always "connected" in a way
   try {
-    // Try to fetch from the specific table.
-    const { error } = await supabase.from('saved_outputs').select('id').limit(1);
+    const { error } = await supabase.from(tableName).select('id').limit(1);
     
     // Error code 42P01 is undefined_table
-    if (error) {
-        if (error.code === '42P01') {
-            return false; // Connection OK, Table Missing
-        }
-        // If auth error, throw it so UI knows credential failed
-        throw error;
+    if (error && error.code === '42P01') {
+      return false; // Connection OK, Table Missing
+    } else if (error) {
+      throw error; // Other error, likely auth
     }
     return true; // Connection OK, Table Exists
   } catch (error: any) {
-    if (error.message && (error.message.includes('42P01') || error.message.includes('relation "saved_outputs" does not exist'))) {
-        return false;
+    if (error.message && (error.message.includes('42P01') || error.message.includes(`relation "${tableName}" does not exist`))) {
+      return false;
     }
     throw error;
   }
 };
 
-// Save an item to the database (Local or Cloud)
+
+// --- Saved Items CRUD ---
+
 export const saveItem = async (toolType: string, title: string, content: string): Promise<{ success: boolean; error?: string }> => {
   try {
     if (supabase) {
-      const { error } = await supabase.from('saved_outputs').insert([
-        {
-          tool_type: toolType,
-          title: title,
-          content: content,
-          created_at: new Date().toISOString()
-        }
-      ]);
-
+      const { error } = await supabase.from('saved_outputs').insert([{ tool_type: toolType, title, content, created_at: new Date().toISOString() }]);
       if (error) throw error;
       return { success: true };
     } else {
-      // Local Storage Fallback
-      const newItem: SavedItem = {
-        id: Date.now(), // Generate a simple timestamp ID
-        tool_type: toolType,
-        title: title,
-        content: content,
-        created_at: new Date().toISOString()
-      };
-      
-      const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const newItem: SavedItem = { id: Date.now(), tool_type: toolType, title, content, created_at: new Date().toISOString() };
+      const existing = localStorage.getItem(LOCAL_STORAGE_KEY_SAVED_ITEMS);
       const items: SavedItem[] = existing ? JSON.parse(existing) : [];
-      items.unshift(newItem); // Add to top
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+      items.unshift(newItem);
+      localStorage.setItem(LOCAL_STORAGE_KEY_SAVED_ITEMS, JSON.stringify(items));
       return { success: true };
     }
   } catch (error: any) {
@@ -84,20 +68,14 @@ export const saveItem = async (toolType: string, title: string, content: string)
   }
 };
 
-// Fetch saved items (Local or Cloud)
 export const getSavedItems = async (): Promise<SavedItem[]> => {
   try {
     if (supabase) {
-      const { data, error } = await supabase
-        .from('saved_outputs')
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await supabase.from('saved_outputs').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       return data as SavedItem[];
     } else {
-      // Local Storage Fetch
-      const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const existing = localStorage.getItem(LOCAL_STORAGE_KEY_SAVED_ITEMS);
       return existing ? JSON.parse(existing) : [];
     }
   } catch (error) {
@@ -106,7 +84,6 @@ export const getSavedItems = async (): Promise<SavedItem[]> => {
   }
 };
 
-// Delete an item
 export const deleteItem = async (id: number): Promise<boolean> => {
   try {
     if (supabase) {
@@ -114,17 +91,98 @@ export const deleteItem = async (id: number): Promise<boolean> => {
       if (error) throw error;
       return true;
     } else {
-      // Local Storage Delete
-      const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const existing = localStorage.getItem(LOCAL_STORAGE_KEY_SAVED_ITEMS);
       if (!existing) return false;
-      
       let items: SavedItem[] = JSON.parse(existing);
       items = items.filter(item => item.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(LOCAL_STORAGE_KEY_SAVED_ITEMS, JSON.stringify(items));
       return true;
     }
   } catch (error) {
     console.error("Error deleting item:", error);
     return false;
   }
+};
+
+// --- Contacts CRUD ---
+
+export const getContacts = async (): Promise<Contact[]> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('contacts').select('*').order('name', { ascending: true });
+            if (error) throw error;
+            return data as Contact[];
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_CONTACTS);
+            return existing ? JSON.parse(existing) : [];
+        }
+    } catch (error) {
+        console.error("Error fetching contacts:", error);
+        return [];
+    }
+};
+
+export const saveContact = async (contact: Omit<Contact, 'id' | 'created_at'>): Promise<Contact | null> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('contacts').insert([contact]).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const newContact: Contact = { ...contact, id: Date.now(), created_at: new Date().toISOString() };
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_CONTACTS);
+            const items: Contact[] = existing ? JSON.parse(existing) : [];
+            items.push(newContact);
+            localStorage.setItem(LOCAL_STORAGE_KEY_CONTACTS, JSON.stringify(items));
+            return newContact;
+        }
+    } catch (error) {
+        console.error("Error saving contact:", error);
+        return null;
+    }
+};
+
+export const updateContact = async (contact: Contact): Promise<Contact | null> => {
+    if (!contact.id) return null;
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('contacts').update(contact).eq('id', contact.id).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_CONTACTS);
+            if (!existing) return null;
+            let items: Contact[] = JSON.parse(existing);
+            const index = items.findIndex(c => c.id === contact.id);
+            if (index > -1) {
+                items[index] = contact;
+                localStorage.setItem(LOCAL_STORAGE_KEY_CONTACTS, JSON.stringify(items));
+                return contact;
+            }
+            return null;
+        }
+    } catch (error) {
+        console.error("Error updating contact:", error);
+        return null;
+    }
+};
+
+export const deleteContact = async (id: number): Promise<boolean> => {
+    try {
+        if (supabase) {
+            const { error } = await supabase.from('contacts').delete().eq('id', id);
+            if (error) throw error;
+            return true;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_CONTACTS);
+            if (!existing) return false;
+            let items: Contact[] = JSON.parse(existing);
+            items = items.filter(c => c.id !== id);
+            localStorage.setItem(LOCAL_STORAGE_KEY_CONTACTS, JSON.stringify(items));
+            return true;
+        }
+    } catch (error) {
+        console.error("Error deleting contact:", error);
+        return false;
+    }
 };

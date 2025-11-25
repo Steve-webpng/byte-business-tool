@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../constants';
-import { ChatMessage, AppTool } from '../types';
+import { ChatMessage, AppTool, Task } from '../types';
 import { streamChat } from '../services/geminiService';
 import { getAdvisorContext } from '../services/advisorService';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useToast } from './ToastContainer';
 
 interface BusinessAdvisorProps {
   onWorkflowSend?: (targetTool: AppTool, data: string) => void;
+  onAddTask?: (title: string) => void;
 }
 
 const SUGGESTIONS = [
@@ -17,11 +19,12 @@ const SUGGESTIONS = [
     "Review my brand voice"
 ];
 
-const BusinessAdvisor: React.FC<BusinessAdvisorProps> = ({ onWorkflowSend }) => {
+const BusinessAdvisor: React.FC<BusinessAdvisorProps> = ({ onWorkflowSend, onAddTask }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -69,6 +72,15 @@ const BusinessAdvisor: React.FC<BusinessAdvisorProps> = ({ onWorkflowSend }) => 
         setLoading(false);
     }
   };
+  
+  const handleCreateTask = (text: string) => {
+    if (onAddTask) {
+      // Use a simple regex or substring to find a potential title from the AI response
+      const potentialTitle = text.split('\n')[0].replace(/[*#]/g, '').trim();
+      onAddTask(potentialTitle);
+      toast.show(`Task "${potentialTitle.substring(0, 20)}..." added to Projects!`, 'success');
+    }
+  };
 
   return (
     <div className="h-full flex flex-col max-w-5xl mx-auto">
@@ -91,26 +103,33 @@ const BusinessAdvisor: React.FC<BusinessAdvisorProps> = ({ onWorkflowSend }) => 
                       </div>
                   )}
 
-                  {msg.role === 'model' && onWorkflowSend && (
-                      <button onClick={() => onWorkflowSend(AppTool.DOCUMENTS, msg.text)} className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Icons.Share />
-                      </button>
-                  )}
+                  <div className="flex items-end gap-2">
+                    {msg.role === 'model' && msg.text && onAddTask && (
+                        <button onClick={() => handleCreateTask(msg.text)} title="Create Task" className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Icons.Plus />
+                        </button>
+                    )}
+                    {msg.role === 'model' && msg.text && onWorkflowSend && (
+                        <button onClick={() => onWorkflowSend(AppTool.DOCUMENTS, msg.text)} title="Send to Doc" className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Icons.Share />
+                        </button>
+                    )}
                   
-                  <div className={`max-w-[75%] rounded-2xl px-5 py-4 text-sm leading-relaxed shadow-sm overflow-hidden ${
-                      msg.role === 'user' 
-                        ? 'bg-blue-600 text-white rounded-br-none' 
-                        : 'bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-bl-none'
-                  }`}>
-                      {msg.role === 'user' ? (
-                          <div className="whitespace-pre-wrap">{msg.text}</div>
-                      ) : (
-                          <MarkdownRenderer content={msg.text} />
-                      )}
-                      
-                      {msg.text === '' && loading && idx === messages.length - 1 && (
-                          <span className="animate-pulse">Thinking...</span>
-                      )}
+                    <div className={`max-w-full rounded-2xl px-5 py-4 text-sm leading-relaxed shadow-sm overflow-hidden ${
+                        msg.role === 'user' 
+                          ? 'bg-blue-600 text-white rounded-br-none' 
+                          : 'bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-bl-none'
+                    }`}>
+                        {msg.role === 'user' ? (
+                            <div className="whitespace-pre-wrap">{msg.text}</div>
+                        ) : (
+                            <MarkdownRenderer content={msg.text} />
+                        )}
+                        
+                        {msg.text === '' && loading && idx === messages.length - 1 && (
+                            <span className="animate-pulse">Thinking...</span>
+                        )}
+                    </div>
                   </div>
 
                   {msg.role === 'user' && (

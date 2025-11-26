@@ -20,6 +20,7 @@ import FileChat from './components/FileChat';
 import CRM from './components/CRM';
 import VoiceNotes from './components/VoiceNotes';
 import CalendarView from './components/CalendarView';
+import ExpenseTracker from './components/ExpenseTracker';
 import { AppTool, ToolDefinition } from './types';
 import { Icons } from './constants';
 import { ToastProvider } from './components/ToastContainer';
@@ -89,6 +90,8 @@ const AppContent: React.FC = () => {
         return <CRM />;
       case AppTool.CALENDAR:
         return <CalendarView />;
+      case AppTool.EXPENSE_TRACKER:
+        return <ExpenseTracker />;
       case AppTool.DOCUMENTS:
         return <SmartEditor workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.FILE_CHAT:
@@ -104,7 +107,7 @@ const AppContent: React.FC = () => {
           ? <UniversalTool tool={selectedToolDef} onBack={() => setCurrentTool(AppTool.LIBRARY)} />
           : <ToolLibrary onSelectTool={handleSelectTool} />;
       case AppTool.CONTENT:
-        return <ContentGenerator workflowData={workflowData} clearWorkflowData={clearWorkflowData} onWorkflowSend={handleWorkflowSend} />;
+        return <ContentGenerator onWorkflowSend={handleWorkflowSend} workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.RESEARCH:
         return <MarketResearch onWorkflowSend={handleWorkflowSend} />;
       case AppTool.ANALYSIS:
@@ -116,38 +119,55 @@ const AppContent: React.FC = () => {
       case AppTool.SETTINGS:
         return <SettingsView onThemeChange={setTheme} />;
       default:
-        return <MissionControl />;
+        return <Dashboard setTool={setCurrentTool} />;
     }
   };
 
+  const handleBackToMissionControl = () => {
+    setCurrentTool(AppTool.MISSION_CONTROL);
+  }
+
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 relative">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar 
         currentTool={currentTool} 
         setTool={setCurrentTool} 
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
       />
-      
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-40 flex items-center px-4 justify-between shadow-sm">
-        <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600 dark:text-slate-300 focus:outline-none">
-          <Icons.Menu />
-        </button>
-        <span className="font-bold text-slate-800 dark:text-slate-200">Byete Business</span>
-        <div className="w-8"></div>
-      </div>
-
-      <main className="flex-1 w-full md:ml-72 p-4 md:p-6 h-screen overflow-y-auto pt-20 md:pt-6">
-        {renderContent()}
+      <main className="flex-1 flex flex-col overflow-hidden relative md:ml-72">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between md:hidden bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-30">
+            <button 
+                onClick={handleBackToMissionControl} 
+                className="flex items-center gap-2"
+            >
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg text-white">
+                    <span className="font-bold text-base">B</span>
+                </div>
+                <h1 className="text-base font-bold text-slate-800 dark:text-white">Byete</h1>
+            </button>
+            <button 
+                onClick={() => setIsMobileOpen(true)}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
+            >
+                <Icons.Menu />
+            </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            {renderContent()}
+        </div>
       </main>
     </div>
   );
 };
 
-const App: React.FC = () => (
-  <ToastProvider>
-    <AppContent />
-  </ToastProvider>
-);
+const App: React.FC = () => {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+};
 
+// FIX: Add default export for App component to be used in index.tsx
 export default App;

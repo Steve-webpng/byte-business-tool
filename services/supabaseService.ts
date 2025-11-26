@@ -1,10 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SavedItem, Contact } from '../types';
+import { SavedItem, Contact, Deal, Expense } from '../types';
 
 let supabase: SupabaseClient | null = null;
 let currentConfig: { url: string; key: string } | null = null;
 const LOCAL_STORAGE_KEY_SAVED_ITEMS = 'byete_saved_items';
 const LOCAL_STORAGE_KEY_CONTACTS = 'byete_contacts';
+const LOCAL_STORAGE_KEY_DEALS = 'byete_deals';
+const LOCAL_STORAGE_KEY_EXPENSES = 'byete_expenses';
 
 // Initialize Supabase with user credentials
 export const initSupabase = (url: string, key: string) => {
@@ -26,7 +28,7 @@ export const disconnectSupabase = () => {
 };
 
 // Test connection by checking for a specific table
-export const testConnection = async (tableName: 'saved_outputs' | 'contacts'): Promise<boolean> => {
+export const testConnection = async (tableName: 'saved_outputs' | 'contacts' | 'deals' | 'expenses'): Promise<boolean> => {
   if (!supabase) return true; // Local mode is always "connected" in a way
   try {
     const { error } = await supabase.from(tableName).select('id').limit(1);
@@ -183,6 +185,148 @@ export const deleteContact = async (id: number): Promise<boolean> => {
         }
     } catch (error) {
         console.error("Error deleting contact:", error);
+        return false;
+    }
+};
+
+
+// --- Deals CRUD ---
+export const getDeals = async (): Promise<Deal[]> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('deals').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return data as Deal[];
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_DEALS);
+            return existing ? JSON.parse(existing) : [];
+        }
+    } catch (error) {
+        console.error("Error fetching deals:", error);
+        return [];
+    }
+};
+
+export const saveDeal = async (deal: Omit<Deal, 'id' | 'created_at'>): Promise<Deal | null> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('deals').insert([deal]).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const newDeal: Deal = { ...deal, id: Date.now(), created_at: new Date().toISOString() };
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_DEALS);
+            const items: Deal[] = existing ? JSON.parse(existing) : [];
+            items.push(newDeal);
+            localStorage.setItem(LOCAL_STORAGE_KEY_DEALS, JSON.stringify(items));
+            return newDeal;
+        }
+    } catch (error) {
+        console.error("Error saving deal:", error);
+        return null;
+    }
+};
+
+export const updateDeal = async (deal: Deal): Promise<Deal | null> => {
+    if (!deal.id) return null;
+    try {
+        // Exclude id and created_at from the update payload for Supabase
+        const { id, created_at, ...updateData } = deal;
+        if (supabase) {
+            const { data, error } = await supabase.from('deals').update(updateData).eq('id', deal.id).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_DEALS);
+            if (!existing) return null;
+            let items: Deal[] = JSON.parse(existing);
+            const index = items.findIndex(d => d.id === deal.id);
+            if (index > -1) {
+                items[index] = deal;
+                localStorage.setItem(LOCAL_STORAGE_KEY_DEALS, JSON.stringify(items));
+                return deal;
+            }
+            return null;
+        }
+    } catch (error) {
+        console.error("Error updating deal:", error);
+        return null;
+    }
+};
+
+export const deleteDeal = async (id: number): Promise<boolean> => {
+    try {
+        if (supabase) {
+            const { error } = await supabase.from('deals').delete().eq('id', id);
+            if (error) throw error;
+            return true;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_DEALS);
+            if (!existing) return false;
+            let items: Deal[] = JSON.parse(existing);
+            items = items.filter(d => d.id !== id);
+            localStorage.setItem(LOCAL_STORAGE_KEY_DEALS, JSON.stringify(items));
+            return true;
+        }
+    } catch (error) {
+        console.error("Error deleting deal:", error);
+        return false;
+    }
+};
+
+// --- Expenses CRUD ---
+export const getExpenses = async (): Promise<Expense[]> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            return data as Expense[];
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_EXPENSES);
+            return existing ? JSON.parse(existing) : [];
+        }
+    } catch (error) {
+        console.error("Error fetching expenses:", error);
+        return [];
+    }
+};
+
+export const saveExpense = async (expense: Omit<Expense, 'id' | 'created_at'>): Promise<Expense | null> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('expenses').insert([expense]).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const newExpense: Expense = { ...expense, id: Date.now(), created_at: new Date().toISOString() };
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_EXPENSES);
+            const items: Expense[] = existing ? JSON.parse(existing) : [];
+            items.push(newExpense);
+            localStorage.setItem(LOCAL_STORAGE_KEY_EXPENSES, JSON.stringify(items));
+            return newExpense;
+        }
+    } catch (error) {
+        console.error("Error saving expense:", error);
+        return null;
+    }
+};
+
+export const deleteExpense = async (id: number): Promise<boolean> => {
+    try {
+        if (supabase) {
+            const { error } = await supabase.from('expenses').delete().eq('id', id);
+            if (error) throw error;
+            return true;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_EXPENSES);
+            if (!existing) return false;
+            let items: Expense[] = JSON.parse(existing);
+            items = items.filter(e => e.id !== id);
+            localStorage.setItem(LOCAL_STORAGE_KEY_EXPENSES, JSON.stringify(items));
+            return true;
+        }
+    } catch (error) {
+        console.error("Error deleting expense:", error);
         return false;
     }
 };

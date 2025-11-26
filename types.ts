@@ -11,6 +11,7 @@ export enum AppTool {
   VOICE_NOTES = 'VOICE_NOTES',
   CRM = 'CRM',
   CALENDAR = 'CALENDAR',
+  EXPENSE_TRACKER = 'EXPENSE_TRACKER',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
   ANALYSIS = 'ANALYSIS',
@@ -145,6 +146,19 @@ export interface Contact {
   notes: string;
 }
 
+// Sales Pipeline / Deals
+export type DealStage = 'Lead In' | 'Contact Made' | 'Proposal Sent' | 'Negotiation' | 'Won' | 'Lost';
+
+export interface Deal {
+    id?: number;
+    created_at?: string;
+    name: string;
+    value: number;
+    contact_id: number; // Foreign key to Contact
+    stage: DealStage;
+    notes: string;
+}
+
 // Calendar
 export interface CalendarEvent {
   id: string;
@@ -154,4 +168,14 @@ export interface CalendarEvent {
   description?: string;
   contactId?: number; // Link to CRM
   type: 'meeting' | 'task' | 'deadline';
+}
+
+// Expense Tracker
+export interface Expense {
+    id?: number;
+    created_at?: string;
+    date: string; // ISO String date only
+    category: string;
+    amount: number;
+    description: string;
 }

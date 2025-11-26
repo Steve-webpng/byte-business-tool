@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
-// FIX: Added 'Contact' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem } from "../types";
+// FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 import { getSavedItems } from "./supabaseService";
 
@@ -272,7 +272,7 @@ export const prioritizeTasks = async (tasks: Task[], context?: string): Promise<
   }));
 };
 
-// FIX: Added function to generate insights for a CRM contact.
+// --- CRM & Sales Pipeline ---
 export const generateContactInsights = async (contact: Contact): Promise<string> => {
     const ai = getAIClient();
     const prompt = `
@@ -299,7 +299,6 @@ export const generateContactInsights = async (contact: Contact): Promise<string>
     return response.text || "No insights generated.";
 };
   
-// FIX: Added function to discover leads using Google Search grounding.
 export const discoverLeads = async (query: string): Promise<{ name: string; role: string; company: string; }[]> => {
     const ai = getAIClient();
     const prompt = `
@@ -331,6 +330,35 @@ export const discoverLeads = async (query: string): Promise<{ name: string; role
       console.error("Failed to parse leads JSON from model response:", text, e);
       return [];
     }
+};
+
+export const suggestNextDealAction = async (deal: Deal, contact: Contact): Promise<string> => {
+    const ai = getAIClient();
+    const prompt = `
+      You are a Sales Coach. Analyze this deal and suggest the single best next action to move it forward.
+      Be specific and actionable (e.g., "Draft a follow-up email mentioning X," not just "Follow up").
+      
+      DEAL DETAILS:
+      Name: ${deal.name}
+      Value: $${deal.value.toLocaleString()}
+      Current Stage: ${deal.stage}
+      Notes: ${deal.notes}
+
+      CONTACT DETAILS:
+      Name: ${contact.name}
+      Company: ${contact.company}
+      Role: ${contact.role}
+      Notes: ${contact.notes}
+      
+      Return a single sentence with your top recommendation.
+    `;
+    
+    const response = await ai.models.generateContent({
+      model: getModel(),
+      contents: prompt,
+    });
+    
+    return response.text || "Could not determine next action.";
 };
 
 // --- Calendar Scheduling ---
@@ -532,7 +560,7 @@ export const streamChat = async function* (
     }
 };
 
-// FIX: Added function to transcribe and summarize audio files.
+// --- Voice & Audio ---
 export const transcribeAndSummarizeAudio = async (
     base64Audio: string
   ): Promise<{ summary: string; transcription: string; actionItems: string[] }> => {
@@ -690,7 +718,6 @@ export const connectLiveSession = async (
           },
           systemInstruction: systemInstruction,
           // Enable transcription
-// FIX: Removed invalid 'model' property from transcription configs.
           inputAudioTranscription: { },
           outputAudioTranscription: { },
         },

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
@@ -40,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
         { id: AppTool.CALENDAR, label: 'Calendar', icon: Icons.CalendarDays },
         { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
         { id: AppTool.CRM, label: 'Contacts (CRM)', icon: Icons.Identification },
+        { id: AppTool.EXPENSE_TRACKER, label: 'Expense Tracker', icon: Icons.Receipt },
         { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
       ]
     },

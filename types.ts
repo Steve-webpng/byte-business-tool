@@ -144,6 +144,8 @@ export interface Contact {
   role: string;
   status: ContactStatus;
   notes: string;
+  last_contacted?: string; // ISO Date
+  follow_up_date?: string; // ISO Date
 }
 
 // Sales Pipeline / Deals

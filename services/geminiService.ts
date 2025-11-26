@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
 import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal } from "../types";
@@ -287,6 +288,7 @@ export const generateContactInsights = async (contact: Contact): Promise<string>
       Role: ${contact.role}
       Status: ${contact.status}
       Notes: ${contact.notes}
+      Last Contacted: ${contact.last_contacted || 'Never'}
       
       Format the output in clean, actionable Markdown. Be concise and direct.
     `;
@@ -297,6 +299,37 @@ export const generateContactInsights = async (contact: Contact): Promise<string>
     });
     
     return response.text || "No insights generated.";
+};
+
+export const generateFollowUpEmail = async (contact: Contact, context?: string): Promise<string> => {
+    const ai = getAIClient();
+    const prompt = `
+      ${context || ''}
+      
+      Write a polite, professional, and personalized follow-up email to this contact.
+      
+      RECIPIENT:
+      Name: ${contact.name}
+      Company: ${contact.company}
+      Role: ${contact.role}
+      Status: ${contact.status}
+      Last Interaction: ${contact.last_contacted || 'Unknown'}
+      Notes: ${contact.notes}
+      
+      CONTEXT:
+      If status is 'Lead', introduce value.
+      If status is 'Contacted', reference previous contact or ask for a meeting.
+      If last interaction was long ago, use a "reconnecting" tone.
+      
+      Output ONLY the email body text. No subject line or markdown formatting.
+    `;
+    
+    const response = await ai.models.generateContent({
+      model: getModel(),
+      contents: prompt,
+    });
+    
+    return response.text || "Failed to generate email.";
 };
   
 export const discoverLeads = async (query: string): Promise<{ name: string; role: string; company: string; }[]> => {

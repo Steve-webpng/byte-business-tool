@@ -24,6 +24,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onNavi
     { id: 'nav-projects', label: 'Projects', icon: Icons.Board, action: () => onNavigate(AppTool.PROJECTS) },
     { id: 'nav-calendar', label: 'Calendar', icon: Icons.CalendarDays, action: () => onNavigate(AppTool.CALENDAR) },
     { id: 'nav-content', label: 'Content Studio', icon: Icons.Pen, action: () => onNavigate(AppTool.CONTENT) },
+    { id: 'nav-audio', label: 'Audio Studio', icon: Icons.SpeakerWave, action: () => onNavigate(AppTool.AUDIO_STUDIO) },
     { id: 'nav-research', label: 'Market Research', icon: Icons.Search, action: () => onNavigate(AppTool.RESEARCH) },
     { id: 'nav-coach', label: 'Sales Coach', icon: Icons.Mic, action: () => onNavigate(AppTool.COACH) },
     { id: 'nav-files', label: 'File Chat', icon: Icons.Upload, action: () => onNavigate(AppTool.FILE_CHAT) },

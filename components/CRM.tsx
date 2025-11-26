@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Contact, ContactStatus, Deal, DealStage } from '../types';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
 import { getContacts, saveContact, updateContact, deleteContact, testConnection, getDeals, saveDeal, updateDeal, deleteDeal } from '../services/supabaseService';
-import { generateContactInsights, discoverLeads, suggestNextDealAction, generateFollowUpEmail } from '../services/geminiService';
+import { generateContactInsights, discoverLeads, suggestNextDealAction, generateFollowUpEmail, performMarketResearch } from '../services/geminiService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import MarkdownRenderer from './MarkdownRenderer';
 import { format, parseISO, addDays, isPast, isToday } from 'date-fns';
@@ -32,6 +32,10 @@ const CRM: React.FC = () => {
     const [dealForm, setDealForm] = useState<{show: boolean, contactId?: number}>({show: false});
     const [newDeal, setNewDeal] = useState<Partial<Deal>>({name: '', value: 0, stage: 'Lead In', notes: ''});
     
+    // Dictation
+    const [isDictating, setIsDictating] = useState(false);
+    const recognitionRef = useRef<any>(null);
+
     const refreshData = async () => {
         setLoading(true);
         const hasContactsTable = await testConnection('contacts');
@@ -138,6 +142,23 @@ const CRM: React.FC = () => {
         }
     };
 
+    const handleNewsIntel = async (contact: Contact) => {
+        if (!contact.company) {
+            toast.show("No company name to research.", "error");
+            return;
+        }
+        setAiLoading(true);
+        setAiInsight('');
+        try {
+            const result = await performMarketResearch(`Latest business news about ${contact.company}`, undefined, 'general');
+            setAiInsight(`### 📰 Latest News for ${contact.company}\n\n${result.text}`);
+        } catch (e) {
+            toast.show("Failed to find news.", "error");
+        } finally {
+            setAiLoading(false);
+        }
+    }
+
     const handleSuggestNextStep = async (deal: Deal) => {
         const contact = contacts.find(c => c.id === deal.contact_id);
         if (!contact) return;
@@ -177,6 +198,30 @@ const CRM: React.FC = () => {
             toast.show("Failed to generate email.", "error");
         } finally {
             setAiLoading(false);
+        }
+    };
+
+    const toggleDictation = () => {
+        if (isDictating) {
+            if (recognitionRef.current) recognitionRef.current.stop();
+            setIsDictating(false);
+        } else {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                toast.show("Speech recognition not supported in this browser.", "error");
+                return;
+            }
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setFormState(prev => ({ ...prev, notes: (prev.notes ? prev.notes + '\n' : '') + transcript }));
+                setIsDictating(false);
+            };
+            recognition.start();
+            setIsDictating(true);
+            recognitionRef.current = recognition;
         }
     };
 
@@ -269,7 +314,7 @@ const CRM: React.FC = () => {
 
     // --- Reminders View ---
     if (view === 'reminders') {
-        const pendingContacts = contacts.filter(c => c.follow_up_date && !isPast(addDays(parseISO(c.follow_up_date), -30))); // Just a filter
+        // ... (Reminders view logic unchanged)
         const overdue = contacts.filter(c => getFollowUpStatus(c.follow_up_date) === 'overdue');
         const today = contacts.filter(c => getFollowUpStatus(c.follow_up_date) === 'today');
         const upcoming = contacts.filter(c => getFollowUpStatus(c.follow_up_date) === 'upcoming').sort((a, b) => new Date(a.follow_up_date!).getTime() - new Date(b.follow_up_date!).getTime());
@@ -297,6 +342,7 @@ const CRM: React.FC = () => {
                 )}
 
                 <div className="flex-1 overflow-y-auto space-y-6">
+                    {/* ... (Reminder items rendering) */}
                     {(overdue.length > 0 || today.length > 0) && (
                         <div className="space-y-4">
                             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide">Needs Attention</h3>
@@ -321,7 +367,7 @@ const CRM: React.FC = () => {
                             ))}
                         </div>
                     )}
-
+                    {/* ... Upcoming ... */}
                     <div>
                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-4">Upcoming</h3>
                         <div className="space-y-2">
@@ -371,7 +417,7 @@ const CRM: React.FC = () => {
                                             </div>
                                             <p className="text-xs text-slate-500 dark:text-slate-400">{contact?.name || 'No contact'}</p>
                                             <p className="text-lg font-bold text-emerald-600 mt-2">${deal.value.toLocaleString()}</p>
-                                            {/* Move buttons */}
+                                            {/* Move buttons could be added here */}
                                         </div>
                                     );
                                 })}
@@ -410,13 +456,25 @@ const CRM: React.FC = () => {
                          <input type="date" value={formState.follow_up_date || ''} onChange={e => setFormState({...formState, follow_up_date: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"/>
                      </div>
                  </div>
-                 <textarea name="notes" value={formState.notes} onChange={e => setFormState({...formState, notes: e.target.value})} placeholder="Notes..." className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg h-32"/>
+                 <div>
+                     <div className="flex justify-between items-center mb-1">
+                         <label className="block text-xs font-bold text-slate-500">Notes</label>
+                         <button 
+                            type="button" 
+                            onClick={toggleDictation}
+                            className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${isDictating ? 'text-red-600 bg-red-50 animate-pulse' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}
+                         >
+                             <Icons.Mic /> {isDictating ? 'Recording...' : 'Dictate'}
+                         </button>
+                     </div>
+                     <textarea name="notes" value={formState.notes} onChange={e => setFormState({...formState, notes: e.target.value})} placeholder="Notes..." className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg h-32"/>
+                 </div>
                  <button type="submit" className="bg-blue-600 text-white font-bold p-3 rounded-lg w-full hover:bg-blue-700 transition-colors">Save Contact</button>
             </form>
         </div>
     );
     
-    // --- Detail View ---
+    // --- Detail View (Unchanged) ---
     if (view === 'detail' && selectedContact) return (
         <div className="max-w-4xl mx-auto">
             <button onClick={() => setView('list')} className="mb-4 text-slate-500">&larr; Back to list</button>
@@ -455,14 +513,17 @@ const CRM: React.FC = () => {
                 </div>
 
                 <div className="mt-6 border-t dark:border-slate-700 pt-6">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-2">
                         <h3 className="font-bold text-sm uppercase text-slate-500 dark:text-slate-400">AI Assistant</h3>
-                        <div className="flex gap-2">
-                            <button onClick={() => handleDraftFollowUp(selectedContact)} disabled={aiLoading} className="bg-blue-50 text-blue-600 font-bold px-4 py-2 rounded-lg text-sm border border-blue-100 hover:bg-blue-100">
-                                {aiLoading ? 'Thinking...' : 'Draft Follow-up Email'}
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={() => handleDraftFollowUp(selectedContact)} disabled={aiLoading} className="bg-blue-50 text-blue-600 font-bold px-3 py-1.5 rounded-lg text-xs border border-blue-100 hover:bg-blue-100">
+                                {aiLoading ? 'Thinking...' : 'Draft Email'}
                             </button>
-                            <button onClick={() => handleGenerateInsights(selectedContact)} disabled={aiLoading} className="bg-purple-50 text-purple-700 font-bold px-4 py-2 rounded-lg text-sm border border-purple-100 hover:bg-purple-100">
-                                Strategy Ideas
+                            <button onClick={() => handleGenerateInsights(selectedContact)} disabled={aiLoading} className="bg-purple-50 text-purple-700 font-bold px-3 py-1.5 rounded-lg text-xs border border-purple-100 hover:bg-purple-100">
+                                Conversation Starters
+                            </button>
+                            <button onClick={() => handleNewsIntel(selectedContact)} disabled={aiLoading} className="bg-emerald-50 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs border border-emerald-100 hover:bg-emerald-100">
+                                News Intel
                             </button>
                         </div>
                     </div>

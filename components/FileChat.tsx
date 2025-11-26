@@ -78,11 +78,12 @@ const FileChat: React.FC = () => {
       if (droppedFile) handleFileChange(droppedFile);
   };
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading !== 'idle' || !extractedText) return;
+  const handleSend = async (e?: React.FormEvent, overrideText?: string) => {
+    e?.preventDefault();
+    const txt = overrideText || input;
+    if (!txt.trim() || loading !== 'idle' || !extractedText) return;
 
-    const userMsg: ChatMessage = { role: 'user', text: input, timestamp: new Date() };
+    const userMsg: ChatMessage = { role: 'user', text: txt, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading('thinking');
@@ -176,8 +177,19 @@ const FileChat: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-6 space-y-6 mb-4">
           {messages.length === 0 && (
-             <div className="h-full flex items-center justify-center">
-                 <p className="text-slate-400 italic">Ask a question about the document to begin.</p>
+             <div className="h-full flex flex-col items-center justify-center">
+                 <p className="text-slate-400 italic mb-4">Ask a question about the document to begin.</p>
+                 <div className="flex flex-wrap justify-center gap-2">
+                     {["Summarize this document", "Identify key risks", "List all dates mentioned", "What are the action items?"].map(q => (
+                         <button 
+                            key={q} 
+                            onClick={() => handleSend(undefined, q)}
+                            className="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-3 py-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                         >
+                             {q}
+                         </button>
+                     ))}
+                 </div>
              </div>
           )}
           {messages.map((msg, idx) => (

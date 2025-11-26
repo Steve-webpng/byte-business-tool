@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
 import { TranscribedNote, Task } from '../types';
-import { transcribeAndSummarizeAudio } from '../services/geminiService';
+import { transcribeAndSummarizeAudio, editContentWithAI } from '../services/geminiService';
 
 interface VoiceNotesProps {
     onAddTask: (title: string, priority?: Task['priority']) => void;
@@ -83,6 +84,18 @@ const VoiceNotes: React.FC<VoiceNotesProps> = ({ onAddTask }) => {
         toast.show("Note deleted.", "info");
     };
 
+    const handleConvert = async (note: TranscribedNote, format: string) => {
+        toast.show(`Converting to ${format}...`, "info");
+        try {
+            const prompt = `Convert the following transcript into a ${format}. Keep the key points but change the structure and tone accordingly.\n\nTRANSCRIPT:\n${note.transcription}`;
+            const result = await editContentWithAI("", prompt);
+            navigator.clipboard.writeText(result);
+            toast.show("Converted and copied to clipboard!", "success");
+        } catch (e) {
+            toast.show("Conversion failed.", "error");
+        }
+    }
+
     return (
         <div className="h-full flex flex-col max-w-5xl mx-auto">
             <div className="mb-6">
@@ -114,7 +127,18 @@ const VoiceNotes: React.FC<VoiceNotesProps> = ({ onAddTask }) => {
                                 <h3 className="font-bold text-slate-800 dark:text-slate-200">{note.summary}</h3>
                                 <p className="text-xs text-slate-400">{new Date(note.createdAt).toLocaleString()}</p>
                             </div>
-                            <button onClick={() => handleDelete(note.id)} className="text-slate-400 hover:text-red-500"><Icons.Trash /></button>
+                            <div className="flex items-center gap-2">
+                                <select 
+                                    className="text-xs bg-slate-100 dark:bg-slate-700 border-none rounded-lg p-1 text-slate-600 dark:text-slate-300"
+                                    onChange={(e) => { if(e.target.value) handleConvert(note, e.target.value); e.target.value=""; }}
+                                >
+                                    <option value="">Convert to...</option>
+                                    <option value="Professional Email">Email</option>
+                                    <option value="Blog Post">Blog Post</option>
+                                    <option value="LinkedIn Post">LinkedIn</option>
+                                </select>
+                                <button onClick={() => handleDelete(note.id)} className="text-slate-400 hover:text-red-500"><Icons.Trash /></button>
+                            </div>
                         </div>
                        
                         <div className="mt-4 border-t border-slate-100 dark:border-slate-700 pt-4">

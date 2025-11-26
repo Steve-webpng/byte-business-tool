@@ -92,9 +92,9 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
           const text = await generateMarketingContent(topic, type, finalTone, context);
           setGeneratedText(text);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.show("Generation failed. Please try again.", "error");
+      toast.show(e.message || "Generation failed. Please try again.", "error");
     } finally {
       setLoading(false);
     }

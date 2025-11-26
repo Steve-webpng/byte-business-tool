@@ -15,6 +15,7 @@ interface UniversalToolProps {
 }
 
 const VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
+const LANGUAGES = ['Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Portuguese', 'Italian'];
 
 const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
   const [input, setInput] = useState('');
@@ -38,12 +39,17 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
   const [isDictating, setIsDictating] = useState(false);
   const recognitionRef = useRef<any>(null);
 
+  // Image Input State
+  const [image, setImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Reset state when tool changes
   useEffect(() => {
       setMode(manualConfig ? 'manual' : 'ai');
       setManualValues({});
       setInput('');
       setOutput('');
+      setImage(null);
       stopSpeaking();
   }, [tool.id, manualConfig]);
 
@@ -58,14 +64,14 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
   const IconComponent = Icons[tool.icon] || Icons.Grid;
 
   const handleAiRun = async () => {
-    if (!input) return;
+    if (!input && !image) return;
     setLoading(true);
     stopSpeaking();
     try {
       const profile = getProfile();
       const context = formatProfileForPrompt(profile);
       
-      const result = await runGenericTool(input, tool.systemInstruction, context);
+      const result = await runGenericTool(input, tool.systemInstruction, context, undefined, image || undefined);
       setOutput(result);
     } catch (e) {
       console.error(e);
@@ -191,6 +197,17 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
       }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              setImage(ev.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   return (
     <div className="h-full flex flex-col max-w-6xl mx-auto">
         {/* Header */}
@@ -245,13 +262,24 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                             <Icons.Pen /> {mode === 'manual' ? 'Input Data' : 'Input Context'}
                         </label>
                         {mode === 'ai' && (
-                            <button 
-                                onClick={toggleDictation}
-                                className={`p-1.5 rounded-full transition-all ${isDictating ? 'text-red-500 bg-red-50 dark:bg-red-900/50 animate-pulse' : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-700'}`}
-                                title="Dictate"
-                            >
-                                <Icons.Mic />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-700 transition-all"
+                                    title="Upload Image"
+                                >
+                                    <Icons.Photo />
+                                </button>
+                                <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                                
+                                <button 
+                                    onClick={toggleDictation}
+                                    className={`p-1.5 rounded-full transition-all ${isDictating ? 'text-red-500 bg-red-50 dark:bg-red-900/50 animate-pulse' : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-700'}`}
+                                    title="Dictate"
+                                >
+                                    <Icons.Mic />
+                                </button>
+                            </div>
                         )}
                     </div>
                     
@@ -289,6 +317,17 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                         </div>
                     ) : (
                         <>
+                            {image && (
+                                <div className="relative mb-3 w-full h-32 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden group">
+                                    <img src={image} alt="Upload" className="w-full h-full object-contain" />
+                                    <button 
+                                        onClick={() => setImage(null)}
+                                        className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-red-500 transition-colors"
+                                    >
+                                        <Icons.X />
+                                    </button>
+                                </div>
+                            )}
                             <textarea
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
@@ -298,9 +337,9 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                                 <button
                                     onClick={handleAiRun}
-                                    disabled={loading || !input}
+                                    disabled={loading || (!input && !image)}
                                     className={`w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-bold text-white transition-all
-                                        ${loading || !input ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg'}`}
+                                        ${loading || (!input && !image) ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg'}`}
                                 >
                                     {loading ? 'Processing...' : <><Icons.Sparkles /> Run with AI</>}
                                 </button>
@@ -373,10 +412,28 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                         <>
                             <MarkdownRenderer content={output} />
                             {mode === 'ai' && !loading && (
-                                <div className="absolute bottom-4 right-4 flex gap-2">
+                                <div className="absolute bottom-4 right-4 flex gap-2 flex-wrap justify-end">
+                                    <div className="flex gap-2">
+                                        <select 
+                                            onChange={(e) => { if(e.target.value) handleQuickAction(`Translate this text to ${e.target.value}`); e.target.value=""; }}
+                                            className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 outline-none cursor-pointer"
+                                        >
+                                            <option value="">Translate...</option>
+                                            {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                                        </select>
+                                        <select 
+                                            onChange={(e) => { if(e.target.value) handleQuickAction(`Format this as a ${e.target.value}`); e.target.value=""; }}
+                                            className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 outline-none cursor-pointer"
+                                        >
+                                            <option value="">Format...</option>
+                                            <option value="Markdown Table">Table</option>
+                                            <option value="Bullet List">List</option>
+                                            <option value="Professional Email">Email</option>
+                                            <option value="Code Block">Code</option>
+                                        </select>
+                                    </div>
                                     <button onClick={() => handleQuickAction("Shorten this")} className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">Shorten</button>
                                     <button onClick={() => handleQuickAction("Expand this")} className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">Expand</button>
-                                    <button onClick={() => handleQuickAction("Critique this output")} className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">Critique</button>
                                 </div>
                             )}
                         </>

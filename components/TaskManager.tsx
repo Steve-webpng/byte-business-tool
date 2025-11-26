@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Task } from '../types';
-import { generateProjectTasks, prioritizeTasks } from '../services/geminiService';
+import { generateProjectTasks, prioritizeTasks, generateSubtasks } from '../services/geminiService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { saveItem } from '../services/supabaseService';
 import { Icons } from '../constants';
@@ -67,6 +68,23 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
       }
   };
 
+  const handleExpandTask = async (task: Task) => {
+      toast.show("Generating subtasks...", "info");
+      try {
+          const profile = getProfile();
+          const context = formatProfileForPrompt(profile);
+          const subtasks = await generateSubtasks(task.title, context);
+          
+          const checklist = subtasks.map(st => `- [ ] ${st}`).join('\n');
+          const updatedDescription = (task.description ? task.description + '\n\n' : '') + "**Subtasks:**\n" + checklist;
+          
+          setTasks(prev => prev.map(t => t.id === task.id ? { ...t, description: updatedDescription } : t));
+          toast.show("Subtasks added to description!", "success");
+      } catch (e) {
+          toast.show("Failed to breakdown task.", "error");
+      }
+  };
+
   const moveTask = (taskId: string, direction: 'forward' | 'backward') => {
       setTasks(prev => prev.map(t => {
           if (t.id !== taskId) return t;
@@ -114,13 +132,18 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                               <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-lg border ${getPriorityColor(task.priority)}`}>
                                   {task.priority}
                               </span>
-                              <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Icons.Trash />
-                              </button>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleExpandTask(task)} className="text-slate-300 hover:text-purple-500 p-1" title="AI Split Task">
+                                      <Icons.Sparkles />
+                                  </button>
+                                  <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 p-1" title="Delete">
+                                      <Icons.Trash />
+                                  </button>
+                              </div>
                           </div>
                           <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-snug mb-2">{task.title}</h4>
                           {task.description && (
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 leading-relaxed">{task.description}</p>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed whitespace-pre-wrap line-clamp-6">{task.description}</div>
                           )}
                           
                           <div className="flex justify-between items-center pt-2 border-t border-slate-50 dark:border-slate-700/50">

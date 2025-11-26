@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -20,6 +18,7 @@ import FocusTimer from './components/FocusTimer';
 import FileChat from './components/FileChat';
 import CRM from './components/CRM';
 import VoiceNotes from './components/VoiceNotes';
+import AudioStudio from './components/AudioStudio';
 import CalendarView from './components/CalendarView';
 import ExpenseTracker from './components/ExpenseTracker';
 import CommandPalette from './components/CommandPalette';
@@ -133,6 +132,8 @@ const AppContent: React.FC = () => {
         return <FileChat />;
       case AppTool.VOICE_NOTES:
         return <VoiceNotes onAddTask={handleAddTask} />;
+      case AppTool.AUDIO_STUDIO:
+        return <AudioStudio />;
       case AppTool.FOCUS:
         return <FocusTimer />;
       case AppTool.LIBRARY:

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { connectLiveSession, float32ToInt16, encodeAudio, decodeAudio, decodeAudioData, analyzeSessionTranscript } from '../services/geminiService';
 import { getProfile } from '../services/settingsService';
@@ -6,6 +7,7 @@ import { Icons } from '../constants';
 import { TranscriptItem } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useToast } from './ToastContainer';
+import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 
 interface LiveSupportProps {
   isWidget?: boolean;
@@ -40,6 +42,7 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
   
   const toast = useToast();
 
@@ -268,6 +271,30 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
       }
   };
 
+  const handleSaveAnalysis = async () => {
+      if (!analysis) return;
+      setSaving(true);
+      const scenarioName = SCENARIOS.find(s => s.id === selectedScenarioId)?.name || 'Sales Practice';
+      const title = `${scenarioName} - ${new Date().toLocaleDateString()}`;
+      
+      const contentToSave = `
+# ${title}
+
+${analysis}
+
+## Transcript Log
+${transcript.map(t => `**${t.role.toUpperCase()}:** ${t.text}`).join('\n\n')}
+      `;
+
+      const res = await saveItem('Coach', title, contentToSave);
+      if (res.success) {
+          toast.show("Analysis saved to history!", "success");
+      } else {
+          toast.show("Failed to save analysis.", "error");
+      }
+      setSaving(false);
+  };
+
   useEffect(() => {
       // Cleanup on unmount
       return () => {
@@ -414,11 +441,22 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
             {/* Transcript / Analysis Panel */}
             {!isWidget && (transcript.length > 0 || active) && (
                 <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 flex flex-col overflow-hidden min-h-[500px]">
-                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
-                        {analysis ? <Icons.Chart /> : <Icons.ChatBubble />}
-                        <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase">
-                            {analysis ? 'AI Performance Analysis' : 'Live Transcript'}
-                        </h3>
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                        <div className="flex items-center gap-2">
+                            {analysis ? <Icons.Chart /> : <Icons.ChatBubble />}
+                            <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase">
+                                {analysis ? 'AI Performance Analysis' : 'Live Transcript'}
+                            </h3>
+                        </div>
+                        {analysis && getSupabaseConfig() && (
+                            <button 
+                                onClick={handleSaveAnalysis} 
+                                disabled={saving}
+                                className="text-xs flex items-center gap-1 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                            >
+                                {saving ? 'Saving...' : <><Icons.Save /> Save to History</>}
+                            </button>
+                        )}
                     </div>
                     
                     <div ref={transcriptRef} className="flex-1 overflow-y-auto pr-2">

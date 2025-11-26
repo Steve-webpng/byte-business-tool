@@ -138,29 +138,40 @@ export const analyzeSEO = async (content: string): Promise<SEOResult> => {
 export const generateImage = async (prompt: string): Promise<string> => {
   const ai = getAIClient();
   
-  // Use specialized image model
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: {
-      parts: [{ text: prompt }],
-    },
-    config: {
-      imageConfig: {
-        aspectRatio: "1:1", 
+  try {
+    // Use specialized image model
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1", 
+        }
       }
-    }
-  });
+    });
 
-  // Extract image from response parts
-  if (response.candidates?.[0]?.content?.parts) {
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData && part.inlineData.data) {
-        return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+    // Extract image from response parts
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData && part.inlineData.data) {
+          return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+        }
+      }
+      
+      // Check for refusal text if no image found
+      const textPart = response.candidates[0].content.parts.find(p => p.text);
+      if (textPart?.text) {
+          throw new Error(textPart.text);
       }
     }
+  } catch (e: any) {
+      console.error("Image Gen Error:", e);
+      throw new Error(e.message || "Image generation failed due to an unknown error.");
   }
   
-  throw new Error("No image generated. Please try a different prompt.");
+  throw new Error("No image generated. The model may have refused the prompt due to safety filters.");
 };
 
 // --- Smart Doc Editor AI ---
@@ -196,22 +207,37 @@ export const runGenericTool = async (
   input: string,
   systemInstruction: string,
   context?: string,
-  contact?: Contact // Optional personalization
+  contact?: Contact, // Optional personalization
+  imageBase64?: string // Optional image input
 ): Promise<string> => {
   const ai = getAIClient();
   
   // Prepend context to the user input
-  let fullContent = context ? `${context}\n\nUSER INPUT:\n${input}` : input;
+  let fullContentText = context ? `${context}\n\nUSER INPUT:\n${input}` : input;
   
   if (contact) {
-      fullContent += `\n\nCONTEXT - TARGET AUDIENCE/RECIPIENT:\nName: ${contact.name}\nCompany: ${contact.company}\nRole: ${contact.role}\n\nPlease personalize the output for this specific person/company.`;
+      fullContentText += `\n\nCONTEXT - TARGET AUDIENCE/RECIPIENT:\nName: ${contact.name}\nCompany: ${contact.company}\nRole: ${contact.role}\n\nPlease personalize the output for this specific person/company.`;
   }
 
   const tableInstruction = "Use Markdown Tables for any comparisons, lists of options, or structured data.";
 
+  // Construct parts
+  const parts: any[] = [{ text: fullContentText }];
+  
+  if (imageBase64) {
+      const base64Data = imageBase64.split(',')[1];
+      const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/png';
+      parts.unshift({
+          inlineData: {
+              data: base64Data,
+              mimeType: mimeType
+          }
+      });
+  }
+
   const response = await ai.models.generateContent({
     model: getModel(),
-    contents: fullContent,
+    contents: { parts },
     config: {
       systemInstruction: `${systemInstruction} ${tableInstruction}`,
     }
@@ -262,6 +288,31 @@ export const generateProjectTasks = async (goal: string, context?: string): Prom
       priority: t.priority as Task['priority'],
       columnId: 'todo' as const
   }));
+};
+
+export const generateSubtasks = async (taskTitle: string, context?: string): Promise<string[]> => {
+  const ai = getAIClient();
+  const prompt = `
+    ${context || ''}
+    Task: "${taskTitle}"
+    
+    Break this task down into 3-5 smaller, actionable subtasks.
+    Return ONLY a JSON array of strings. Example: ["Draft outline", "Review with team"]
+  `;
+
+  const response = await ai.models.generateContent({
+    model: getModel(),
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      }
+    }
+  });
+
+  return JSON.parse(response.text || "[]");
 };
 
 export const prioritizeTasks = async (tasks: Task[], context?: string): Promise<Task[]> => {

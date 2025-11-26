@@ -1,6 +1,4 @@
 
-
-
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
@@ -53,6 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
         { id: AppTool.DOCUMENTS, label: 'Smart Docs', icon: Icons.DocumentText },
         { id: AppTool.CONTENT, label: 'Content Studio', icon: Icons.Pen },
         { id: AppTool.VOICE_NOTES, label: 'Voice Notes', icon: Icons.ClipboardText },
+        { id: AppTool.AUDIO_STUDIO, label: 'Audio Studio', icon: Icons.SpeakerWave },
       ]
     },
     {

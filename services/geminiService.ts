@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 import { getSavedItems } from "./supabaseService";
 
@@ -96,6 +96,42 @@ export const generateMarketingCampaign = async (
   const text = response.text;
   if (!text) throw new Error("No campaign generated");
   return JSON.parse(text) as MarketingCampaign;
+};
+
+export const analyzeSEO = async (content: string): Promise<SEOResult> => {
+    const ai = getAIClient();
+    const prompt = `
+      Analyze the following content for SEO effectiveness.
+      Content: "${content.substring(0, 2000)}..."
+      
+      Provide:
+      1. A Score (0-100).
+      2. Detected Keywords (top 5).
+      3. Suggestions for improvement (max 3).
+      4. Readability Grade (e.g., "8th Grade", "University").
+      
+      Return strict JSON.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    score: { type: Type.NUMBER },
+                    keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    readability: { type: Type.STRING }
+                },
+                required: ["score", "keywords", "suggestions", "readability"]
+            }
+        }
+    });
+
+    return JSON.parse(response.text || "{}") as SEOResult;
 };
 
 // --- Image Generation ---
@@ -472,21 +508,31 @@ export const generateMeetingBriefing = async (contact: Contact, context?: string
 };
 
 // --- Market Research with Grounding ---
-export const performMarketResearch = async (query: string, context?: string, isDeepDive: boolean = false) => {
+export const performMarketResearch = async (query: string, context?: string, mode: 'general' | 'competitor' | 'persona' | 'trends' = 'general') => {
   const ai = getAIClient();
   
   let instruction = `Using the Google Search tool, find real-time information to answer: "${query}".`;
   
-  if (isDeepDive) {
+  if (mode === 'competitor') {
     instruction += `
-      Provide a "Competitor Matrix" or "Data Table" comparing key entities if applicable.
-      Structure the response with:
-      1. Executive Summary
-      2. Key Market Trends
-      3. Competitive Analysis (Use a Markdown Table)
-      4. Actionable Opportunities
+      Focus on identifying direct competitors.
+      Provide a "Competitor Matrix" (Markdown Table) comparing features, pricing, and positioning.
+      Structure: Executive Summary, Competitor Table, and Strategic Opportunities.
+    `;
+  } else if (mode === 'persona') {
+    instruction += `
+      Based on the research, create 3 detailed Customer Personas.
+      For each: Give a Name, Role, Pain Points, Goals, and "How we help them".
+      Format clearly with headers.
+    `;
+  } else if (mode === 'trends') {
+    instruction += `
+      Focus on forecasting future trends for the next 1-3 years.
+      Identify: Emerging Technologies, shifting Consumer Behaviors, and Regulatory risks.
+      Use bullet points and a "Prediction" section.
     `;
   } else {
+    // General
     instruction += `\nProvide a comprehensive summary with key business insights, competitor analysis, and current market trends. Use Markdown Tables where appropriate.`;
   }
 
@@ -567,6 +613,39 @@ export const analyzeData = async (
   if (!jsonText) throw new Error("No analysis generated");
   return JSON.parse(jsonText) as AnalysisResult;
 };
+
+export const forecastData = async (currentData: ChartDataPoint[]): Promise<ChartDataPoint[]> => {
+    const ai = getAIClient();
+    
+    const prompt = `
+      Given the following data points: ${JSON.stringify(currentData)}
+      
+      Predict the next 3 data points based on the trend (Linear or Exponential growth/decay).
+      Return ONLY the 3 new data points as a JSON array of objects with 'name' (e.g., next year/month) and 'value' properties.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING },
+                        value: { type: Type.NUMBER }
+                    },
+                    required: ['name', 'value']
+                }
+            }
+        }
+    });
+
+    const newPoints = JSON.parse(response.text || "[]");
+    return [...currentData, ...newPoints];
+}
 
 // --- Chat with History (Streaming) ---
 export const streamChat = async function* (
@@ -756,7 +835,8 @@ export const connectLiveSession = async (
     onClose: (e: CloseEvent) => void,
     onError: (e: ErrorEvent) => void
   },
-  systemInstruction: string = "You are a senior business coach."
+  systemInstruction: string = "You are a senior business coach.",
+  voiceName: string = 'Kore' // Add voiceName parameter
 ) => {
   const ai = getAIClient();
   try {
@@ -771,7 +851,7 @@ export const connectLiveSession = async (
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } }, // Use dynamic voice
           },
           systemInstruction: systemInstruction,
           // Enable transcription

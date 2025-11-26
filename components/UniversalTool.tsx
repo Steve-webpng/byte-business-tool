@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ToolDefinition } from '../types';
-import { runGenericTool, generateSpeech, decodeAudio, decodeAudioData } from '../services/geminiService';
+import { runGenericTool, generateSpeech, decodeAudio, decodeAudioData, editContentWithAI } from '../services/geminiService';
 import { MANUAL_TOOLS } from '../services/manualLogic';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
@@ -73,6 +74,20 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuickAction = async (action: string) => {
+      if (!output) return;
+      setLoading(true);
+      try {
+          const newResult = await editContentWithAI(output, action);
+          setOutput(newResult);
+          toast.show("Result updated!", "success");
+      } catch(e) {
+          toast.show("Action failed.", "error");
+      } finally {
+          setLoading(false);
+      }
   };
 
   const handleManualRun = () => {
@@ -353,9 +368,18 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                         )}
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-6">
+                <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-6 relative">
                     {output ? (
-                        <MarkdownRenderer content={output} />
+                        <>
+                            <MarkdownRenderer content={output} />
+                            {mode === 'ai' && !loading && (
+                                <div className="absolute bottom-4 right-4 flex gap-2">
+                                    <button onClick={() => handleQuickAction("Shorten this")} className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">Shorten</button>
+                                    <button onClick={() => handleQuickAction("Expand this")} className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">Expand</button>
+                                    <button onClick={() => handleQuickAction("Critique this output")} className="text-xs bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">Critique</button>
+                                </div>
+                            )}
+                        </>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 opacity-60">
                              <div className="mb-2 text-slate-300 dark:text-slate-600"><Icons.DocumentText /></div>

@@ -20,6 +20,14 @@ const SCENARIOS = [
     { id: 'support', name: 'Angry Customer', desc: 'De-escalate a service issue.', role: 'Act as an angry customer who has experienced a service failure. Demand a solution. Be impatient.' }
 ];
 
+const VOICES = [
+    { id: 'Kore', name: 'Kore (Deep, Professional)' },
+    { id: 'Puck', name: 'Puck (Warm, Friendly)' },
+    { id: 'Charon', name: 'Charon (Calm, Male)' },
+    { id: 'Fenrir', name: 'Fenrir (Bright, Male)' },
+    { id: 'Zephyr', name: 'Zephyr (Gentle, Female)' },
+];
+
 const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
@@ -28,6 +36,7 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
   const [currentUserTranscript, setCurrentUserTranscript] = useState('');
   const [currentModelTranscript, setCurrentModelTranscript] = useState('');
   const [selectedScenarioId, setSelectedScenarioId] = useState('cold-call');
+  const [selectedVoice, setSelectedVoice] = useState('Kore');
   const [sessionDuration, setSessionDuration] = useState(0);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -102,15 +111,18 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
       let systemContext = `You are an AI Roleplay Partner for business training. 
       YOUR CURRENT ROLE: ${scenario.role}
       
-      CONTEXT:
-      User's Business: "${profile?.name || 'Generic Corp'}"
+      USER'S BUSINESS CONTEXT:
+      Name: "${profile?.name || 'their business'}"
       Industry: ${profile?.industry || 'General Business'}
       
-      INSTRUCTIONS:
+      REALISM INSTRUCTIONS:
       - Stay in character 100% of the time.
-      - Be realistic. Do not be overly helpful if the scenario calls for skepticism.
-      - Keep responses concise (1-3 sentences) to allow for a natural back-and-forth flow.
-      - Do not break character to give feedback during the call. Wait for the user to end the call.
+      - Use natural conversational fillers like "umm," "let me see..." to sound more human.
+      - Vary your response pacing. Sometimes be quick, sometimes pause before speaking.
+      - React emotionally based on your role. If you are a skeptical prospect, sound slightly impatient or disinterested initially.
+      - Reference the user's business context when appropriate (e.g., "So, tell me about ${profile?.name || 'your company'}...").
+      - Keep responses concise (1-3 sentences) to maintain a natural back-and-forth flow.
+      - Do not break character to give feedback during the call.
       `;
 
       // Output Context (Model returns 24kHz)
@@ -228,7 +240,8 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
               stopSession();
           }
         },
-        systemContext
+        systemContext,
+        selectedVoice // Pass selected voice
       );
       sessionPromiseRef.current = sessionPromise;
 
@@ -280,17 +293,36 @@ const LiveSupport: React.FC<LiveSupportProps> = ({ isWidget = false }) => {
 
         {/* Scenario Selector (Only show if not active and no analysis yet) */}
         {!active && !analysis && !isWidget && transcript.length === 0 && (
-            <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 animate-fade-in">
-                {SCENARIOS.map(s => (
-                    <button
-                        key={s.id}
-                        onClick={() => setSelectedScenarioId(s.id)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${selectedScenarioId === s.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800'}`}
-                    >
-                        <h4 className={`font-bold ${selectedScenarioId === s.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}>{s.name}</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{s.desc}</p>
-                    </button>
-                ))}
+             <div className="w-full mb-8 animate-fade-in space-y-6">
+                <div>
+                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">1. Choose a Scenario</h3>
+                    <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {SCENARIOS.map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => setSelectedScenarioId(s.id)}
+                                className={`p-4 rounded-xl border-2 text-left transition-all ${selectedScenarioId === s.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800'}`}
+                            >
+                                <h4 className={`font-bold ${selectedScenarioId === s.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}>{s.name}</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{s.desc}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div>
+                     <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">2. Select an AI Voice</h3>
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                         {VOICES.map(v => (
+                             <button 
+                                key={v.id}
+                                onClick={() => setSelectedVoice(v.id)}
+                                className={`p-3 text-center rounded-lg border-2 font-medium transition-all text-sm ${selectedVoice === v.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-400'}`}
+                             >
+                                 {v.name}
+                             </button>
+                         ))}
+                     </div>
+                </div>
             </div>
         )}
 

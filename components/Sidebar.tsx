@@ -1,5 +1,6 @@
 
 
+
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
@@ -10,9 +11,10 @@ interface SidebarProps {
   setTool: (tool: AppTool) => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
+  onOpenSearch: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, setIsMobileOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, setIsMobileOpen, onOpenSearch }) => {
   const [hasKey, setHasKey] = useState(false);
   const [modelName, setModelName] = useState('Gemini');
 
@@ -98,13 +100,22 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
                 <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mt-0.5 opacity-90">Business OS</span>
             </div>
           </div>
-          <button 
-            onClick={() => setIsMobileOpen(false)} 
-            className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Close sidebar"
-          >
-            <Icons.X />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+                onClick={onOpenSearch}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 hidden md:block"
+                title="Command Palette (Ctrl+K)"
+            >
+                <Icons.Search />
+            </button>
+            <button 
+                onClick={() => setIsMobileOpen(false)} 
+                className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Close sidebar"
+            >
+                <Icons.X />
+            </button>
+          </div>
         </div>
         
         {/* Navigation */}

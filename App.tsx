@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -21,9 +22,10 @@ import CRM from './components/CRM';
 import VoiceNotes from './components/VoiceNotes';
 import CalendarView from './components/CalendarView';
 import ExpenseTracker from './components/ExpenseTracker';
-import { AppTool, ToolDefinition } from './types';
+import CommandPalette from './components/CommandPalette';
+import { AppTool, ToolDefinition, Task } from './types';
 import { Icons } from './constants';
-import { ToastProvider } from './components/ToastContainer';
+import { ToastProvider, useToast } from './components/ToastContainer';
 import { getTheme, Theme } from './services/settingsService';
 
 const AppContent: React.FC = () => {
@@ -32,9 +34,11 @@ const AppContent: React.FC = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [workflowData, setWorkflowData] = useState<string | null>(null);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   
   // Lifted state for Tasks to allow access from other components
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const toast = useToast();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -62,6 +66,18 @@ const AppContent: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
+  // Global Keyboard Shortcut for Command Palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            setIsCommandPaletteOpen(prev => !prev);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleSelectTool = (tool: ToolDefinition) => {
     setSelectedToolDef(tool);
     setCurrentTool(AppTool.UNIVERSAL_TOOL);
@@ -76,6 +92,25 @@ const AppContent: React.FC = () => {
     setWorkflowData(null);
   };
 
+  const handleAddTask = (title: string) => {
+      const newTask: Task = { 
+          id: `task-${Date.now()}`, 
+          title, 
+          priority: 'Medium', 
+          columnId: 'todo' 
+      };
+      setTasks(prev => [...prev, newTask]);
+      toast.show("Task added to Projects!", "success");
+  };
+
+  const handleNavigate = (tool: AppTool, def?: ToolDefinition) => {
+      if (tool === AppTool.UNIVERSAL_TOOL && def) {
+          handleSelectTool(def);
+      } else {
+          setCurrentTool(tool);
+      }
+  };
+
   const renderContent = () => {
     switch (currentTool) {
       case AppTool.MISSION_CONTROL:
@@ -83,7 +118,7 @@ const AppContent: React.FC = () => {
       case AppTool.DASHBOARD:
         return <Dashboard setTool={setCurrentTool} />;
       case AppTool.ADVISOR:
-        return <BusinessAdvisor onWorkflowSend={handleWorkflowSend} onAddTask={(title) => setTasks(prev => [...prev, { id: Date.now().toString(), title, priority: 'Medium', columnId: 'todo' }])} />;
+        return <BusinessAdvisor onWorkflowSend={handleWorkflowSend} onAddTask={handleAddTask} />;
       case AppTool.PROJECTS:
         return <TaskManager tasks={tasks} setTasks={setTasks} />;
       case AppTool.CRM:
@@ -97,7 +132,7 @@ const AppContent: React.FC = () => {
       case AppTool.FILE_CHAT:
         return <FileChat />;
       case AppTool.VOICE_NOTES:
-        return <VoiceNotes onAddTask={(title) => setTasks(prev => [...prev, { id: Date.now().toString(), title, priority: 'Medium', columnId: 'todo' }])} />;
+        return <VoiceNotes onAddTask={handleAddTask} />;
       case AppTool.FOCUS:
         return <FocusTimer />;
       case AppTool.LIBRARY:
@@ -134,18 +169,30 @@ const AppContent: React.FC = () => {
         setTool={setCurrentTool} 
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
+        onOpenSearch={() => setIsCommandPaletteOpen(true)}
       />
+      
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen} 
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={handleNavigate}
+        onAddTask={handleAddTask}
+      />
+
       <main className="flex-1 flex flex-col overflow-hidden relative md:ml-72">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between md:hidden bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-30">
-            <button 
-                onClick={handleBackToMissionControl} 
-                className="flex items-center gap-2"
-            >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg text-white">
-                    <span className="font-bold text-base">B</span>
-                </div>
-                <h1 className="text-base font-bold text-slate-800 dark:text-white">Byete</h1>
-            </button>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={handleBackToMissionControl} 
+                    className="flex items-center gap-2"
+                >
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg text-white">
+                        <span className="font-bold text-base">B</span>
+                    </div>
+                    <h1 className="text-base font-bold text-slate-800 dark:text-white">Byete</h1>
+                </button>
+                <button onClick={() => setIsCommandPaletteOpen(true)} className="p-2 text-slate-500"><Icons.Search /></button>
+            </div>
             <button 
                 onClick={() => setIsMobileOpen(true)}
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
@@ -169,5 +216,4 @@ const App: React.FC = () => {
   );
 };
 
-// FIX: Add default export for App component to be used in index.tsx
 export default App;

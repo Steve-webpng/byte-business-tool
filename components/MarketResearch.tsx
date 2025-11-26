@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { performMarketResearch } from '../services/geminiService';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
@@ -13,13 +14,10 @@ interface MarketResearchProps {
 
 const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWorkflowSend }) => {
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
+  const [analysisMode, setAnalysisMode] = useState<'general' | 'competitor' | 'persona' | 'trends'>('general');
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('Global');
-  const [isDeepDive, setIsDeepDive] = useState(false);
   const [result, setResult] = useState<{ text: string; sources: GroundingChunk[] } | null>(null);
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualUrl, setManualUrl] = useState('');
-  const [manualNote, setManualNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
@@ -37,7 +35,7 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
           context += `\nFOCUS REGION: ${region}. Prioritize data and sources relevant to this region.`;
       }
 
-      const data = await performMarketResearch(query, context, isDeepDive);
+      const data = await performMarketResearch(query, context, analysisMode);
       setResult({ text: data.text, sources: data.groundingChunks });
     } catch (err) {
       console.error(err);
@@ -47,7 +45,11 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
   };
 
   const handleSave = async () => {
-    // ... (rest of the function is unchanged, but included for completeness)
+    // ... (Implementation similar to other components)
+    if(!result) return;
+    setSaving(true);
+    await saveItem('Research', query, result.text);
+    setSaving(false);
   };
 
   return (
@@ -85,59 +87,53 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
       {mode === 'ai' && (
           <>
             <form onSubmit={handleResearchAI} className={`relative ${isWidget ? 'mb-4' : 'mb-8'}`}>
-                <div className="flex flex-col md:flex-row gap-3">
-                    <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
-                        <Icons.Search />
+                <div className="flex flex-col gap-3">
+                    <div className="flex flex-col md:flex-row gap-3">
+                        <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                            <Icons.Search />
+                            </div>
+                            <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder={isWidget ? "Research query..." : "e.g., 'Current trends in sustainable packaging'"}
+                            className={`w-full pl-12 pr-4 rounded-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none ${isWidget ? 'py-2 text-sm' : 'py-4 text-lg'}`}
+                            />
                         </div>
-                        <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder={isWidget ? "Research query..." : "e.g., 'Current trends in sustainable packaging'"}
-                        className={`w-full pl-12 pr-4 rounded-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none ${isWidget ? 'py-2 text-sm' : 'py-4 text-lg'}`}
-                        />
+                        
+                        {!isWidget && (
+                            <div className="flex items-center gap-2">
+                                <select 
+                                    value={region} 
+                                    onChange={(e) => setRegion(e.target.value)}
+                                    className="py-4 px-6 rounded-full border border-slate-300 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
+                                >
+                                    <option>Global</option>
+                                    <option>US</option>
+                                    <option>Europe</option>
+                                    <option>Asia</option>
+                                </select>
+                                <button
+                                    type="submit"
+                                    disabled={loading || !query}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-bold disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
+                                >
+                                    {loading ? 'Searching...' : 'Research'}
+                                </button>
+                            </div>
+                        )}
                     </div>
                     
                     {!isWidget && (
-                        <div className="flex items-center gap-2">
-                            <select 
-                                value={region} 
-                                onChange={(e) => setRegion(e.target.value)}
-                                className="py-4 px-6 rounded-full border border-slate-300 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
-                            >
-                                <option>Global</option>
-                                <option>US</option>
-                                <option>Europe</option>
-                                <option>Asia</option>
-                            </select>
-                            <button
-                                type="submit"
-                                disabled={loading || !query}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-bold disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
-                            >
-                                {loading ? 'Searching...' : 'Research'}
-                            </button>
+                        <div className="flex justify-center gap-2">
+                            <button type="button" onClick={() => setAnalysisMode('general')} className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${analysisMode === 'general' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>General</button>
+                            <button type="button" onClick={() => setAnalysisMode('competitor')} className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${analysisMode === 'competitor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>Competitor Matrix</button>
+                            <button type="button" onClick={() => setAnalysisMode('persona')} className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${analysisMode === 'persona' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>Cust. Persona</button>
+                            <button type="button" onClick={() => setAnalysisMode('trends')} className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${analysisMode === 'trends' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>Trend Forecast</button>
                         </div>
                     )}
                 </div>
-                
-                {!isWidget && (
-                    <div className="mt-3 flex justify-center">
-                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-3 py-1">
-                            <input 
-                                type="checkbox" 
-                                id="deepDive" 
-                                checked={isDeepDive} 
-                                onChange={(e) => setIsDeepDive(e.target.checked)}
-                                className="rounded text-blue-600 focus:ring-blue-500"
-                            />
-                            <label htmlFor="deepDive" className="text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
-                                Generate Comparison Matrix Table
-                            </label>
-                        </div>
-                    </div>
-                )}
             </form>
 
             {loading && (
@@ -151,7 +147,7 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
                 <div className={`flex-1 overflow-y-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 animate-fade-in ${isWidget ? 'p-4' : 'p-8'}`}>
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-2">
-                        <Icons.Chart /> Executive Summary
+                        <Icons.Chart /> Executive Summary ({analysisMode})
                     </h4>
                     <div className="flex gap-2 items-center">
                         {onWorkflowSend && (

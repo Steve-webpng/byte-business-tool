@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData } from '../services/geminiService';
+import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData, analyzeSEO, editContentWithAI } from '../services/geminiService';
 import { saveItem, getSupabaseConfig, getSavedItems } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
-import { MarketingCampaign, SavedItem, AppTool } from '../types';
+import { MarketingCampaign, SavedItem, AppTool, SEOResult } from '../types';
 import { Icons } from '../constants';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useToast } from './ToastContainer';
@@ -30,6 +31,10 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Power-up states
+  const [seoResult, setSeoResult] = useState<SEOResult | null>(null);
+  const [seoLoading, setSeoLoading] = useState(false);
   
   // Audio state
   const [speaking, setSpeaking] = useState(false);
@@ -69,6 +74,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
     setGeneratedText('');
     setGeneratedImage('');
     setCampaign(null);
+    setSeoResult(null);
     
     try {
       const profile = getProfile();
@@ -93,6 +99,34 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
       setLoading(false);
     }
   };
+
+  const handleAnalyzeSEO = async () => {
+      if (!generatedText) return;
+      setSeoLoading(true);
+      try {
+          const res = await analyzeSEO(generatedText);
+          setSeoResult(res);
+      } catch(e) {
+          toast.show("SEO Analysis failed.", "error");
+      } finally {
+          setSeoLoading(false);
+      }
+  };
+
+  const handleModifyText = async (instruction: string) => {
+      if (!generatedText) return;
+      setLoading(true);
+      try {
+          const res = await editContentWithAI(generatedText, instruction);
+          setGeneratedText(res);
+          setSeoResult(null); // Reset SEO as content changed
+          toast.show("Content updated!", "success");
+      } catch(e) {
+          toast.show("Update failed.", "error");
+      } finally {
+          setLoading(false);
+      }
+  }
 
   const handleSave = async () => {
     setSaving(true);
@@ -422,7 +456,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
             </div>
           </div>
 
-          <div className="flex-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-6 overflow-y-auto">
+          <div className="flex-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-6 overflow-y-auto relative">
             {mode === 'Image' ? (
                 generatedImage ? (
                     <div className="flex items-center justify-center h-full">
@@ -463,7 +497,56 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                 </div>
             ) : (
                 generatedText ? (
-                    <MarkdownRenderer content={generatedText} />
+                    <>
+                        {seoResult && (
+                            <div className="mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase flex items-center gap-2"><Icons.Chart /> SEO Score</h4>
+                                    <span className={`text-sm font-bold px-2 py-1 rounded ${seoResult.score > 70 ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{seoResult.score}/100</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-400 mb-3">
+                                    <div>
+                                        <strong>Readability:</strong> {seoResult.readability}
+                                    </div>
+                                    <div>
+                                        <strong>Keywords:</strong> {seoResult.keywords.join(', ')}
+                                    </div>
+                                </div>
+                                {seoResult.suggestions.length > 0 && (
+                                    <div className="text-xs bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-700">
+                                        <strong className="block mb-1 text-slate-500">Suggestions:</strong>
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            {seoResult.suggestions.map((s, i) => <li key={i}>{s}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <MarkdownRenderer content={generatedText} />
+                        
+                        {/* Power-Up Toolbar */}
+                        <div className="absolute bottom-4 right-4 flex gap-2">
+                            <button 
+                                onClick={handleAnalyzeSEO} 
+                                disabled={seoLoading}
+                                className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
+                            >
+                                {seoLoading ? 'Analyzing...' : <><Icons.Chart /> Check SEO</>}
+                            </button>
+                            <button 
+                                onClick={() => handleModifyText("Translate this to Spanish")}
+                                className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
+                            >
+                                <Icons.Globe /> Translate
+                            </button>
+                            <button 
+                                onClick={() => handleModifyText("Make this text shorter and more punchy")}
+                                className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700"
+                            >
+                                Shorten
+                            </button>
+                        </div>
+                    </>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
                         <div className="mb-2 text-slate-300 dark:text-slate-600"><Icons.DocumentText /></div>

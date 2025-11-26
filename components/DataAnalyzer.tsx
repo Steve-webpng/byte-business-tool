@@ -1,10 +1,9 @@
 
-
 import React, { useState, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { analyzeData } from '../services/geminiService';
+import { analyzeData, forecastData } from '../services/geminiService';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
-import { AnalysisResult } from '../types';
+import { AnalysisResult, ChartDataPoint } from '../types';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
 
@@ -32,6 +31,7 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [forecasting, setForecasting] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -72,7 +72,7 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
               name: parts[0].trim(),
               value: isNaN(val) ? 0 : val
           };
-      }).filter(d => d !== null) as {name: string, value: number}[];
+      }).filter(d => d !== null) as ChartDataPoint[];
 
       if (dataPoints.length === 0) {
           toast.show("Invalid data format. Use 'Label, Value'", "error");
@@ -84,6 +84,24 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
           type: manualChartType,
           data: dataPoints
       });
+  };
+
+  const handleForecast = async () => {
+      if (!result || !result.data.length) return;
+      setForecasting(true);
+      try {
+          const forecastedData = await forecastData(result.data);
+          setResult({
+              ...result,
+              summary: result.summary + " (Includes AI Forecast)",
+              data: forecastedData
+          });
+          toast.show("Forecast added to chart.", "success");
+      } catch(e) {
+          toast.show("Forecasting failed.", "error");
+      } finally {
+          setForecasting(false);
+      }
   };
 
   const handleSave = async () => {
@@ -160,19 +178,19 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
       {!isWidget && (
         <div className="flex justify-between items-end">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Data Analyzer</h2>
-            <p className="text-slate-500">Visualize data instantly via AI interpretation or manual input.</p>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Data Analyzer</h2>
+            <p className="text-slate-500 dark:text-slate-400">Visualize data instantly via AI interpretation or manual input.</p>
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-lg">
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
               <button 
                   onClick={() => setMode('ai')}
-                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${mode === 'ai' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${mode === 'ai' ? 'bg-white dark:bg-slate-700 shadow text-purple-600 dark:text-purple-400' : 'text-slate-500 hover:text-slate-700'}`}
               >
                   AI Analysis
               </button>
               <button 
                   onClick={() => setMode('manual')}
-                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${mode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${mode === 'manual' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}`}
               >
                   Manual Entry
               </button>
@@ -181,7 +199,7 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
       )}
 
       {isWidget && (
-        <div className="flex items-center gap-2 mb-3 text-slate-700">
+        <div className="flex items-center gap-2 mb-3 text-slate-700 dark:text-slate-300">
           <Icons.Chart />
           <h3 className="font-bold text-sm uppercase tracking-wide">Data Analyzer</h3>
         </div>
@@ -190,14 +208,14 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
       <div className={`grid ${isWidget ? 'grid-cols-1 gap-4' : 'grid-cols-1 lg:grid-cols-3 gap-6'} flex-1 min-h-0`}>
         
         {/* Input Section */}
-        <div className={`bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 overflow-y-auto ${isWidget ? 'p-3 order-2' : 'p-6'}`}>
+        <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-4 overflow-y-auto ${isWidget ? 'p-3 order-2' : 'p-6'}`}>
           
           {mode === 'ai' ? (
               <>
                 <div 
                     onClick={() => fileInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
-                    ${preview ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50'}
+                    ${preview ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'}
                     ${isWidget ? 'h-24' : 'h-32'}
                     `}
                 >
@@ -208,19 +226,19 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
                         <div className={`mx-auto text-slate-400 mb-2 ${isWidget ? 'h-6 w-6' : 'h-8 w-8'}`}>
                             <Icons.Chart />
                         </div>
-                        <p className="text-sm font-bold text-slate-600">Upload Chart Image</p>
+                        <p className="text-sm font-bold text-slate-600 dark:text-slate-400">Upload Chart Image</p>
                     </div>
                     )}
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Instructions</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Instructions</label>
                     <textarea 
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         placeholder="Describe the data or ask specific questions..."
-                        className={`w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 ${isWidget ? 'h-20' : 'h-32'}`}
+                        className={`w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 ${isWidget ? 'h-20' : 'h-32'}`}
                     />
                 </div>
 
@@ -228,7 +246,7 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
                     onClick={handleAnalyzeAI}
                     disabled={loading || (!prompt && !file)}
                     className={`mt-auto w-full py-3 rounded-lg font-bold text-white transition-all shadow-md
-                        ${loading || (!prompt && !file) ? 'bg-slate-300' : 'bg-purple-600 hover:bg-purple-700'}`}
+                        ${loading || (!prompt && !file) ? 'bg-slate-300 dark:bg-slate-600' : 'bg-purple-600 hover:bg-purple-700'}`}
                 >
                     {loading ? 'Analyzing...' : 'AI Analyze'}
                 </button>
@@ -236,21 +254,21 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
           ) : (
               <>
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Chart Title</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Chart Title</label>
                     <input 
                         type="text"
                         value={manualTitle}
                         onChange={(e) => setManualTitle(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                         placeholder="e.g. Q1 Sales"
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Chart Type</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Chart Type</label>
                     <select 
                         value={manualChartType}
                         onChange={(e) => setManualChartType(e.target.value as any)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm outline-none bg-white"
+                        className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                     >
                         <option value="bar">Bar Chart</option>
                         <option value="line">Line Chart</option>
@@ -258,12 +276,12 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
                     </select>
                 </div>
                 <div className="flex-1">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data (Label, Value)</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Data (Label, Value)</label>
                     <textarea 
                         value={manualDataInput}
                         onChange={(e) => setManualDataInput(e.target.value)}
                         placeholder="Jan, 100&#10;Feb, 150&#10;Mar, 120"
-                        className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 h-full font-mono"
+                        className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 h-full font-mono"
                     />
                 </div>
                 <button
@@ -278,32 +296,43 @@ const DataAnalyzer: React.FC<DataAnalyzerProps> = ({ isWidget = false }) => {
         </div>
 
         {/* Output Section */}
-        <div className={`${isWidget ? 'col-span-1 h-64 order-1' : 'lg:col-span-2 min-h-[500px]'} bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col`}>
+        <div className={`${isWidget ? 'col-span-1 h-64 order-1' : 'lg:col-span-2 min-h-[500px]'} bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col`}>
           {result ? (
             <>
-              <div className="mb-4 flex justify-between items-start border-b border-slate-100 pb-4">
+              <div className="mb-4 flex justify-between items-start border-b border-slate-100 dark:border-slate-700 pb-4">
                 <div>
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
                         {mode === 'ai' ? 'AI Insight' : 'Chart Title'}
                     </span>
-                    <p className="text-slate-700 font-medium leading-relaxed mt-1">{result.summary}</p>
+                    <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed mt-1">{result.summary}</p>
                 </div>
-                {getSupabaseConfig() && (
-                    <button onClick={handleSave} disabled={saving} className="text-emerald-600 hover:text-emerald-700 flex-shrink-0 ml-4">
-                        {saving ? <span className="text-[10px] font-bold">Saving...</span> : <Icons.Save />}
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {result.data.length > 0 && !isWidget && (
+                        <button 
+                            onClick={handleForecast} 
+                            disabled={forecasting}
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                            {forecasting ? 'Predicting...' : <><Icons.Sparkles /> Predict Future</>}
+                        </button>
+                    )}
+                    {getSupabaseConfig() && (
+                        <button onClick={handleSave} disabled={saving} className="text-emerald-600 hover:text-emerald-700 flex-shrink-0 ml-2">
+                            {saving ? <span className="text-[10px] font-bold">Saving...</span> : <Icons.Save />}
+                        </button>
+                    )}
+                </div>
               </div>
-              <div className="flex-1 rounded-xl p-4 bg-slate-50 relative flex items-center justify-center border border-slate-100">
+              <div className="flex-1 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50 relative flex items-center justify-center border border-slate-100 dark:border-slate-700">
                  {renderChart()}
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-60">
-               <div className={`bg-slate-100 rounded-full flex items-center justify-center mb-4 ${isWidget ? 'w-12 h-12' : 'w-20 h-20'}`}>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 opacity-60">
+               <div className={`bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 ${isWidget ? 'w-12 h-12' : 'w-20 h-20'}`}>
                   <Icons.Chart />
                </div>
-               <p className="font-bold text-slate-500">No chart generated</p>
+               <p className="font-bold text-slate-500 dark:text-slate-400">No chart generated</p>
                <p className="text-sm mt-1">
                    {mode === 'ai' ? 'Upload an image to analyze' : 'Enter data to visualize'}
                </p>

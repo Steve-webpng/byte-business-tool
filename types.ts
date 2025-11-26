@@ -1,5 +1,4 @@
 
-
 import { Type } from "@google/genai";
 
 export enum AppTool {
@@ -49,6 +48,7 @@ export interface ManualToolConfig {
 export interface ChartDataPoint {
   name: string;
   value: number;
+  [key: string]: any; // Allow extra keys for multi-line charts or forecasts
 }
 
 export interface AnalysisResult {
@@ -180,4 +180,12 @@ export interface Expense {
     category: string;
     amount: number;
     description: string;
+}
+
+// SEO Analysis
+export interface SEOResult {
+    score: number;
+    keywords: string[];
+    suggestions: string[];
+    readability: string;
 }

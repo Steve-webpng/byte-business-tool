@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../constants';
-import { ChatMessage, AppTool } from '../types';
+import { ChatMessage } from '../types';
 import { streamChat } from '../services/geminiService';
 import { useToast } from './ToastContainer';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -14,17 +14,6 @@ const FileChat: React.FC = () => {
   const [loading, setLoading] = useState<'idle' | 'parsing' | 'thinking'>('idle');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
-
-  useEffect(() => {
-    // Initialize PDF worker safely
-    try {
-        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-        }
-    } catch (e) {
-        console.warn("PDF Worker Init Warning:", e);
-    }
-  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,6 +32,13 @@ const FileChat: React.FC = () => {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
+                    // Dynamically import PDF.js only when needed to prevent bundle crash
+                    const pdfjsLib = await import('pdfjs-dist');
+                    
+                    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+                    }
+
                     const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
                     const pdf = await pdfjsLib.getDocument(typedarray).promise;
                     let fullText = '';

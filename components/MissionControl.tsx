@@ -1,30 +1,32 @@
 
 import React, { useEffect, useState } from 'react';
 import { Icons } from '../constants';
-import { getDeals, getExpenses, getContacts, getSavedItems } from '../services/supabaseService';
-import { Contact, Deal, Expense, Task } from '../types';
+import { getDeals, getExpenses, getContacts, getSavedItems, getInvoices } from '../services/supabaseService';
+import { Contact, Deal, Expense, Task, Invoice } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const MissionControl: React.FC = () => {
   const [metrics, setMetrics] = useState({
       totalPipeline: 0,
-      wonRevenue: 0,
+      invoicedRevenue: 0,
       totalExpenses: 0,
       totalContacts: 0,
       newLeads: 0,
       tasksTotal: 0,
       tasksDone: 0,
-      recentDocs: 0
+      recentDocs: 0,
+      outstandingInvoices: 0
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
       const fetchData = async () => {
-          const [deals, expenses, contacts, savedItems] = await Promise.all([
+          const [deals, expenses, contacts, savedItems, invoices] = await Promise.all([
               getDeals(),
               getExpenses(),
               getContacts(),
-              getSavedItems()
+              getSavedItems(),
+              getInvoices()
           ]);
 
           // Projects are stored in local storage for now
@@ -32,20 +34,26 @@ const MissionControl: React.FC = () => {
           const tasks: Task[] = savedBoard ? JSON.parse(savedBoard) : [];
 
           const totalPipeline = deals.filter(d => d.stage !== 'Lost' && d.stage !== 'Won').reduce((acc, d) => acc + Number(d.value), 0);
-          const wonRevenue = deals.filter(d => d.stage === 'Won').reduce((acc, d) => acc + Number(d.value), 0);
+          
+          const calculateInvoiceTotal = (inv: Invoice) => inv.items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
+          
+          const invoicedRevenue = invoices.filter(i => i.status === 'Paid').reduce((acc, i) => acc + calculateInvoiceTotal(i), 0);
+          const outstandingInvoices = invoices.filter(i => i.status === 'Sent' || i.status === 'Overdue').reduce((acc, i) => acc + calculateInvoiceTotal(i), 0);
+
           const totalExpenses = expenses.reduce((acc, e) => acc + Number(e.amount), 0);
           const newLeads = contacts.filter(c => c.status === 'Lead').length;
           const tasksDone = tasks.filter(t => t.columnId === 'done').length;
 
           setMetrics({
               totalPipeline,
-              wonRevenue,
+              invoicedRevenue,
               totalExpenses,
               totalContacts: contacts.length,
               newLeads,
               tasksTotal: tasks.length,
               tasksDone,
-              recentDocs: savedItems.length
+              recentDocs: savedItems.length,
+              outstandingInvoices
           });
           setLoading(false);
       };
@@ -54,8 +62,8 @@ const MissionControl: React.FC = () => {
 
   const financialData = [
       { name: 'Expenses', value: metrics.totalExpenses, color: '#ef4444' },
-      { name: 'Won Rev', value: metrics.wonRevenue, color: '#10b981' },
-      { name: 'Pipeline', value: metrics.totalPipeline, color: '#3b82f6' }
+      { name: 'Revenue', value: metrics.invoicedRevenue, color: '#10b981' },
+      { name: 'Outstanding', value: metrics.outstandingInvoices, color: '#f59e0b' }
   ];
 
   const taskProgress = metrics.tasksTotal === 0 ? 0 : Math.round((metrics.tasksDone / metrics.tasksTotal) * 100);
@@ -66,7 +74,7 @@ const MissionControl: React.FC = () => {
               <Icon />
           </div>
           <div>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</p>
+              <p className="text-xs font-bold text-slate-50 dark:text-slate-400 uppercase tracking-wide">{label}</p>
               <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200">{value}</h3>
               {subLabel && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subLabel}</p>}
           </div>
@@ -89,9 +97,9 @@ const MissionControl: React.FC = () => {
                 <p className="text-slate-500 dark:text-slate-400">Real-time overview of your business operations.</p>
             </div>
             <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-400 uppercase">Net Cash Flow (Est)</p>
-                <p className={`text-xl font-bold ${metrics.wonRevenue - metrics.totalExpenses >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    ${(metrics.wonRevenue - metrics.totalExpenses).toLocaleString()}
+                <p className="text-xs font-bold text-slate-400 uppercase">Net Cash Flow</p>
+                <p className={`text-xl font-bold ${metrics.invoicedRevenue - metrics.totalExpenses >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    ${(metrics.invoicedRevenue - metrics.totalExpenses).toLocaleString()}
                 </p>
             </div>
         </div>
@@ -100,10 +108,10 @@ const MissionControl: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <StatCard 
                 icon={Icons.Money} 
-                label="Active Pipeline" 
-                value={`$${metrics.totalPipeline.toLocaleString()}`} 
-                subLabel={`${metrics.wonRevenue > 0 ? `$${metrics.wonRevenue.toLocaleString()} won` : 'No closed deals yet'}`}
-                color="bg-blue-500"
+                label="Collected Revenue" 
+                value={`$${metrics.invoicedRevenue.toLocaleString()}`} 
+                subLabel={`$${metrics.outstandingInvoices.toLocaleString()} pending`}
+                color="bg-emerald-500"
             />
             <StatCard 
                 icon={Icons.Users} 
@@ -124,7 +132,7 @@ const MissionControl: React.FC = () => {
                 label="Project Velocity" 
                 value={`${taskProgress}%`} 
                 subLabel={`${metrics.tasksDone}/${metrics.tasksTotal} tasks done`}
-                color="bg-emerald-500"
+                color="bg-blue-500"
             />
         </div>
 
@@ -175,7 +183,7 @@ const MissionControl: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-6 p-3 bg-white/5 rounded-lg text-xs text-slate-300 italic">
-                        "Your pipeline value exceeds expenses by {metrics.totalPipeline > metrics.totalExpenses ? 'a healthy margin' : 'a narrow margin'}. Focus on closing deals."
+                        "You have ${metrics.outstandingInvoices.toLocaleString()} in outstanding invoices. Consider sending follow-ups."
                     </div>
                 </div>
 

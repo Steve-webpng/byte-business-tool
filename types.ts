@@ -12,6 +12,7 @@ export enum AppTool {
   CRM = 'CRM',
   CALENDAR = 'CALENDAR',
   EXPENSE_TRACKER = 'EXPENSE_TRACKER',
+  INVOICES = 'INVOICES',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
   ANALYSIS = 'ANALYSIS',
@@ -181,6 +182,26 @@ export interface Expense {
     category: string;
     amount: number;
     description: string;
+}
+
+// Invoices
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface Invoice {
+  id?: number;
+  created_at?: string;
+  invoice_number: string;
+  contact_id: number;
+  date: string;
+  due_date: string;
+  items: InvoiceItem[];
+  status: 'Draft' | 'Sent' | 'Paid' | 'Overdue';
+  notes?: string;
 }
 
 // SEO Analysis

@@ -1,17 +1,18 @@
 
 import { getProfile } from './settingsService';
-import { getSavedItems, getDeals, getExpenses, getContacts } from './supabaseService';
-import { Task } from '../types';
+import { getSavedItems, getDeals, getExpenses, getContacts, getInvoices } from './supabaseService';
+import { Task, Invoice } from '../types';
 
 export const getAdvisorContext = async (): Promise<string> => {
   const profile = getProfile();
   
   // Fetch all critical business data
-  const [savedItems, deals, expenses, contacts] = await Promise.all([
+  const [savedItems, deals, expenses, contacts, invoices] = await Promise.all([
       getSavedItems(),
       getDeals(),
       getExpenses(),
-      getContacts()
+      getContacts(),
+      getInvoices()
   ]);
   
   // Fetch tasks from local storage snapshot
@@ -20,9 +21,13 @@ export const getAdvisorContext = async (): Promise<string> => {
 
   // Calculate Financials
   const totalPipeline = deals.filter(d => d.stage !== 'Lost' && d.stage !== 'Won').reduce((acc, d) => acc + Number(d.value), 0);
-  const wonRevenue = deals.filter(d => d.stage === 'Won').reduce((acc, d) => acc + Number(d.value), 0);
+  
+  const calcInvoiceTotal = (inv: Invoice) => inv.items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
+  const paidRevenue = invoices.filter(i => i.status === 'Paid').reduce((acc, i) => acc + calcInvoiceTotal(i), 0);
+  const outstandingInvoices = invoices.filter(i => i.status === 'Sent' || i.status === 'Overdue').reduce((acc, i) => acc + calcInvoiceTotal(i), 0);
+
   const totalExpenses = expenses.reduce((acc, e) => acc + Number(e.amount), 0);
-  const netCash = wonRevenue - totalExpenses;
+  const netCash = paidRevenue - totalExpenses;
 
   let context = `You are the Chief of Staff and Strategic Advisor for a business. 
   Your goal is to help the user manage their operations, suggest tasks, write content, and provide strategic advice.
@@ -30,10 +35,11 @@ export const getAdvisorContext = async (): Promise<string> => {
   You have access to real-time business metrics. USE THEM.
   
   --- FINANCIAL HEALTH SNAPSHOT ---
-  - Total Revenue (Won Deals): $${wonRevenue.toLocaleString()}
+  - Total Revenue (Paid Invoices): $${paidRevenue.toLocaleString()}
   - Total Expenses: $${totalExpenses.toLocaleString()}
   - Net Cash Flow: $${netCash.toLocaleString()}
-  - Active Pipeline Value: $${totalPipeline.toLocaleString()}
+  - Outstanding Invoices (Pending): $${outstandingInvoices.toLocaleString()}
+  - Active Pipeline Value (Potential): $${totalPipeline.toLocaleString()}
   
   --- CRM SNAPSHOT ---
   - Total Contacts: ${contacts.length}

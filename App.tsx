@@ -21,6 +21,7 @@ import VoiceNotes from './components/VoiceNotes';
 import AudioStudio from './components/AudioStudio';
 import CalendarView from './components/CalendarView';
 import ExpenseTracker from './components/ExpenseTracker';
+import InvoiceBuilder from './components/InvoiceBuilder';
 import CommandPalette from './components/CommandPalette';
 import { AppTool, ToolDefinition, Task } from './types';
 import { Icons } from './constants';
@@ -126,6 +127,8 @@ const AppContent: React.FC = () => {
         return <CalendarView />;
       case AppTool.EXPENSE_TRACKER:
         return <ExpenseTracker />;
+      case AppTool.INVOICES:
+        return <InvoiceBuilder />;
       case AppTool.DOCUMENTS:
         return <SmartEditor workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.FILE_CHAT:

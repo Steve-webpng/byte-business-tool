@@ -41,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
         { id: AppTool.CALENDAR, label: 'Calendar', icon: Icons.CalendarDays },
         { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
         { id: AppTool.CRM, label: 'Contacts (CRM)', icon: Icons.Identification },
+        { id: AppTool.INVOICES, label: 'Invoices', icon: Icons.DocumentCurrency },
         { id: AppTool.EXPENSE_TRACKER, label: 'Expense Tracker', icon: Icons.Receipt },
         { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
       ]

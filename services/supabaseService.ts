@@ -1,5 +1,6 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SavedItem, Contact, Deal, Expense } from '../types';
+import { SavedItem, Contact, Deal, Expense, Invoice } from '../types';
 
 let supabase: SupabaseClient | null = null;
 let currentConfig: { url: string; key: string } | null = null;
@@ -7,6 +8,7 @@ const LOCAL_STORAGE_KEY_SAVED_ITEMS = 'byete_saved_items';
 const LOCAL_STORAGE_KEY_CONTACTS = 'byete_contacts';
 const LOCAL_STORAGE_KEY_DEALS = 'byete_deals';
 const LOCAL_STORAGE_KEY_EXPENSES = 'byete_expenses';
+const LOCAL_STORAGE_KEY_INVOICES = 'byete_invoices';
 
 // Initialize Supabase with user credentials
 export const initSupabase = (url: string, key: string) => {
@@ -28,7 +30,7 @@ export const disconnectSupabase = () => {
 };
 
 // Test connection by checking for a specific table
-export const testConnection = async (tableName: 'saved_outputs' | 'contacts' | 'deals' | 'expenses'): Promise<boolean> => {
+export const testConnection = async (tableName: 'saved_outputs' | 'contacts' | 'deals' | 'expenses' | 'invoices'): Promise<boolean> => {
   if (!supabase) return true; // Local mode is always "connected" in a way
   try {
     const { error } = await supabase.from(tableName).select('id').limit(1);
@@ -327,6 +329,89 @@ export const deleteExpense = async (id: number): Promise<boolean> => {
         }
     } catch (error) {
         console.error("Error deleting expense:", error);
+        return false;
+    }
+};
+
+// --- Invoices CRUD ---
+export const getInvoices = async (): Promise<Invoice[]> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return data as Invoice[];
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_INVOICES);
+            return existing ? JSON.parse(existing) : [];
+        }
+    } catch (error) {
+        console.error("Error fetching invoices:", error);
+        return [];
+    }
+};
+
+export const saveInvoice = async (invoice: Omit<Invoice, 'id' | 'created_at'>): Promise<Invoice | null> => {
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.from('invoices').insert([invoice]).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const newInvoice: Invoice = { ...invoice, id: Date.now(), created_at: new Date().toISOString() };
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_INVOICES);
+            const items: Invoice[] = existing ? JSON.parse(existing) : [];
+            items.unshift(newInvoice);
+            localStorage.setItem(LOCAL_STORAGE_KEY_INVOICES, JSON.stringify(items));
+            return newInvoice;
+        }
+    } catch (error) {
+        console.error("Error saving invoice:", error);
+        return null;
+    }
+};
+
+export const updateInvoice = async (invoice: Invoice): Promise<Invoice | null> => {
+    if (!invoice.id) return null;
+    try {
+        const { id, created_at, ...updateData } = invoice;
+        if (supabase) {
+            const { data, error } = await supabase.from('invoices').update(updateData).eq('id', invoice.id).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_INVOICES);
+            if (!existing) return null;
+            let items: Invoice[] = JSON.parse(existing);
+            const index = items.findIndex(i => i.id === invoice.id);
+            if (index > -1) {
+                items[index] = invoice;
+                localStorage.setItem(LOCAL_STORAGE_KEY_INVOICES, JSON.stringify(items));
+                return invoice;
+            }
+            return null;
+        }
+    } catch (error) {
+        console.error("Error updating invoice:", error);
+        return null;
+    }
+};
+
+export const deleteInvoice = async (id: number): Promise<boolean> => {
+    try {
+        if (supabase) {
+            const { error } = await supabase.from('invoices').delete().eq('id', id);
+            if (error) throw error;
+            return true;
+        } else {
+            const existing = localStorage.getItem(LOCAL_STORAGE_KEY_INVOICES);
+            if (!existing) return false;
+            let items: Invoice[] = JSON.parse(existing);
+            items = items.filter(i => i.id !== id);
+            localStorage.setItem(LOCAL_STORAGE_KEY_INVOICES, JSON.stringify(items));
+            return true;
+        }
+    } catch (error) {
+        console.error("Error deleting invoice:", error);
         return false;
     }
 };

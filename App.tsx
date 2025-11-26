@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -18,6 +19,7 @@ import FocusTimer from './components/FocusTimer';
 import FileChat from './components/FileChat';
 import CRM from './components/CRM';
 import VoiceNotes from './components/VoiceNotes';
+import CalendarView from './components/CalendarView';
 import { AppTool, ToolDefinition } from './types';
 import { Icons } from './constants';
 import { ToastProvider } from './components/ToastContainer';
@@ -85,6 +87,8 @@ const AppContent: React.FC = () => {
         return <TaskManager tasks={tasks} setTasks={setTasks} />;
       case AppTool.CRM:
         return <CRM />;
+      case AppTool.CALENDAR:
+        return <CalendarView />;
       case AppTool.DOCUMENTS:
         return <SmartEditor workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.FILE_CHAT:

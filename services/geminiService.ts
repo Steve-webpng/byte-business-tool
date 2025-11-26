@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
+import { getSavedItems } from "./supabaseService";
 
 const getAIClient = () => {
   // 1. Try User Setting
@@ -24,10 +25,24 @@ export const generateMarketingContent = async (
   topic: string,
   type: string,
   tone: string,
-  context?: string
+  context?: string,
+  contact?: Contact // Optional contact for personalization
 ): Promise<string> => {
   const ai = getAIClient();
-  const prompt = `${context || ''}\n\nWrite a ${tone} ${type} about "${topic}". Use Markdown formatting. Use Markdown Tables for any structured data or lists of pros/cons. Keep it concise but professional.`;
+  
+  let prompt = `${context || ''}\n\nWrite a ${tone} ${type} about "${topic}". Use Markdown formatting. Use Markdown Tables for any structured data or lists of pros/cons. Keep it concise but professional.`;
+  
+  if (contact) {
+      prompt += `
+      
+      RECIPIENT DETAILS:
+      Name: ${contact.name}
+      Company: ${contact.company}
+      Role: ${contact.role}
+      
+      INSTRUCTION: Personalize the content specifically for this recipient. Mention their company or role where appropriate to make it feel bespoke.
+      `;
+  }
   
   const response = await ai.models.generateContent({
     model: getModel(),
@@ -143,12 +158,18 @@ export const editContentWithAI = async (
 export const runGenericTool = async (
   input: string,
   systemInstruction: string,
-  context?: string
+  context?: string,
+  contact?: Contact // Optional personalization
 ): Promise<string> => {
   const ai = getAIClient();
   
   // Prepend context to the user input
-  const fullContent = context ? `${context}\n\nUSER INPUT:\n${input}` : input;
+  let fullContent = context ? `${context}\n\nUSER INPUT:\n${input}` : input;
+  
+  if (contact) {
+      fullContent += `\n\nCONTEXT - TARGET AUDIENCE/RECIPIENT:\nName: ${contact.name}\nCompany: ${contact.company}\nRole: ${contact.role}\n\nPlease personalize the output for this specific person/company.`;
+  }
+
   const tableInstruction = "Use Markdown Tables for any comparisons, lists of options, or structured data.";
 
   const response = await ai.models.generateContent({
@@ -310,6 +331,83 @@ export const discoverLeads = async (query: string): Promise<{ name: string; role
       console.error("Failed to parse leads JSON from model response:", text, e);
       return [];
     }
+};
+
+// --- Calendar Scheduling ---
+export const parseScheduleRequest = async (request: string): Promise<{ title: string; start: string; end: string; description: string }> => {
+    const ai = getAIClient();
+    const now = new Date().toISOString();
+    
+    const prompt = `
+      Current Date/Time: ${now}
+      
+      User Request: "${request}"
+      
+      Extract the scheduling details.
+      1. Title of the event.
+      2. Start time (ISO 8601 format). If duration not specified, assume 1 hour.
+      3. End time (ISO 8601 format).
+      4. Description (optional context from the request).
+      
+      Return JSON only.
+    `;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    start: { type: Type.STRING },
+                    end: { type: Type.STRING },
+                    description: { type: Type.STRING }
+                },
+                required: ["title", "start", "end"]
+            }
+        }
+    });
+    
+    return JSON.parse(response.text || "{}");
+};
+
+export const generateMeetingBriefing = async (contact: Contact, context?: string): Promise<string> => {
+    const ai = getAIClient();
+    
+    // Fetch recent saved items to add context about what the user has been working on
+    const savedItems = await getSavedItems();
+    const recentWork = savedItems.slice(0, 3).map(i => `- ${i.title}: ${i.content.substring(0, 100)}...`).join('\n');
+
+    const prompt = `
+      ${context || ''}
+      
+      I have a meeting with:
+      Name: ${contact.name}
+      Role: ${contact.role}
+      Company: ${contact.company}
+      Notes: ${contact.notes}
+      
+      My Recent Work Context (what I've been doing):
+      ${recentWork}
+      
+      Generate a "Pre-Meeting Briefing" document.
+      Include:
+      1. **Goal Alignment**: How my recent work relates to them.
+      2. **Talking Points**: 3 strategic topics to discuss.
+      3. **Questions to Ask**: 3 discovery questions specific to their role.
+      4. **Company Research**: Placeholder for recent news about ${contact.company}.
+      
+      Format in clean Markdown.
+    `;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt
+    });
+    
+    return response.text || "Briefing generation failed.";
 };
 
 // --- Market Research with Grounding ---
@@ -486,6 +584,34 @@ export const transcribeAndSummarizeAudio = async (
     }
     
     return JSON.parse(jsonText);
+};
+
+export const analyzeSessionTranscript = async (transcript: TranscriptItem[]): Promise<string> => {
+  const ai = getAIClient();
+  const conversation = transcript.map(t => `${t.role.toUpperCase()}: ${t.text}`).join('\n');
+  
+  const prompt = `
+    Analyze the following sales coaching / roleplay transcript.
+    
+    TRANSCRIPT:
+    ${conversation}
+    
+    Provide a structured critique for the 'USER' based on their performance in this scenario:
+    
+    1. **Overall Performance Score** (1-10)
+    2. **Key Strengths** (Bullet points)
+    3. **Areas for Improvement** (Bullet points)
+    4. **Specific Feedback** on objection handling, tone, and clarity.
+    
+    Format the output in clean Markdown. Use bolding for emphasis.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: getModel(),
+    contents: prompt,
+  });
+
+  return response.text || "Unable to analyze session. Please try again.";
 };
 
 // --- Live API Helpers ---

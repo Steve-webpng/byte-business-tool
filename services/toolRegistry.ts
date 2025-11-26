@@ -94,6 +94,35 @@ export const TOOLS: ToolDefinition[] = [
     placeholder: 'Industry (e.g. Airline, Coffee Shop)...'
   },
 
+  // --- Data Science (New) ---
+  {
+    id: 'data-1',
+    name: 'SQL Optimization Advisor',
+    description: 'Improve query performance.',
+    category: 'Data Science',
+    icon: 'Code',
+    systemInstruction: 'You are a Database Administrator. Analyze the SQL query provided. Suggest optimizations to improve performance (indexes, rewrites, avoiding subqueries).',
+    placeholder: 'Paste slow SQL query...'
+  },
+  {
+    id: 'data-2',
+    name: 'Python Pandas Helper',
+    description: 'Data manipulation snippets.',
+    category: 'Data Science',
+    icon: 'Code',
+    systemInstruction: 'You are a Data Scientist. Provide the Python/Pandas code snippet to perform the data manipulation described.',
+    placeholder: 'e.g. "Group by date and sum revenue"...'
+  },
+  {
+    id: 'data-3',
+    name: 'Data Viz Suggester',
+    description: 'Choose the right chart.',
+    category: 'Data Science',
+    icon: 'Chart',
+    systemInstruction: 'You are a Data Visualization Expert. Recommend the best chart type (Bar, Line, Scatter, Heatmap, etc.) for the data description provided. Explain why.',
+    placeholder: 'Describe your data variables...'
+  },
+
   // --- Real Estate ---
   {
     id: 're-1',
@@ -157,6 +186,24 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'DocumentText',
     systemInstruction: 'You are a Landlord. Write a formal, legally-sound (generic) notice of rent increase to a tenant. Check local laws reminder.',
     placeholder: 'Current rent, New rent, Effective date...'
+  },
+  {
+    id: 're-6',
+    name: 'Airbnb Listing Optimizer',
+    description: 'Improve rental rankings.',
+    category: 'Real Estate',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Superhost. Rewrite the Airbnb listing title and description to maximize click-through rate and bookings. Focus on unique selling points.',
+    placeholder: 'Current title and description...'
+  },
+  {
+    id: 're-7',
+    name: 'House Flipping Calculator',
+    description: 'Estimate potential profit.',
+    category: 'Real Estate',
+    icon: 'Money',
+    systemInstruction: 'You are a Real Estate Investor. Estimate the potential profit for a flip based on Purchase Price, Renovation Costs, Holding Costs, and ARV (After Repair Value).',
+    placeholder: 'Price: 150k, Reno: 40k, ARV: 250k...'
   },
 
   // --- Design & Visuals ---
@@ -242,6 +289,53 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Megaphone',
     systemInstruction: 'You are a LinkedIn Ghostwriter. Write 5 attention-grabbing opening lines (hooks) for a LinkedIn post about the topic provided. Focus on curiosity and value.',
     placeholder: 'Post topic...'
+  },
+  
+  // --- Social Media Management (New) ---
+  {
+    id: 'soc-mgmt-1',
+    name: 'Multi-Platform Post Gen',
+    description: 'Create optimized posts for LinkedIn, Twitter, and IG.',
+    category: 'Social Media',
+    icon: 'Megaphone',
+    systemInstruction: 'You are a Social Media Manager. Create 3 distinct versions of a social media post based on the topic provided: 1. LinkedIn (Professional, Storytelling), 2. Twitter/X (Short, Punchy, Thread-starter), 3. Instagram (Visual description + Engaging Caption).',
+    placeholder: 'Topic or link to share...'
+  },
+  {
+    id: 'soc-mgmt-2',
+    name: 'Smart Hashtag Generator',
+    description: 'Find high-reach and niche tags.',
+    category: 'Social Media',
+    icon: 'Tag',
+    systemInstruction: 'You are a Social Media Growth Expert. Generate 30 hashtags for the topic provided. Group them into: "High Volume" (Broad reach), "Niche Specific" (Targeted), and "Community" (Engagement).',
+    placeholder: 'Post content or image description...'
+  },
+  {
+    id: 'soc-mgmt-3',
+    name: 'Influencer Outreach Script',
+    description: 'DM scripts for collaborations.',
+    category: 'Social Media',
+    icon: 'Users',
+    systemInstruction: 'You are a Brand Partnerships Manager. Write a personalized outreach DM or Email to an influencer proposing a collaboration. Focus on mutual value and authentic connection. Ask for their media kit.',
+    placeholder: 'Influencer name, niche, and your offer...'
+  },
+  {
+    id: 'soc-mgmt-4',
+    name: 'Content Repurposing Tool',
+    description: 'Turn blogs/videos into social posts.',
+    category: 'Social Media',
+    icon: 'Loop',
+    systemInstruction: 'You are a Content Strategist. Repurpose the provided long-form content (text or summary) into: 1. A Twitter Thread (5 tweets), 2. A LinkedIn Carousel outline (5 slides), 3. An Instagram Reel Script.',
+    placeholder: 'Paste blog post or video summary...'
+  },
+  {
+    id: 'soc-mgmt-5',
+    name: 'Social Media Audit',
+    description: 'Analyze profile strengths/weaknesses.',
+    category: 'Social Media',
+    icon: 'Search',
+    systemInstruction: 'You are a Social Media Consultant. Conduct a mini-audit based on the profile details provided. Identify 3 things working well and 3 specific opportunities for growth/optimization.',
+    placeholder: 'Profile bio, content style, and engagement metrics...'
   },
 
   // --- Brainstorming ---
@@ -374,6 +468,33 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'ChatBubble',
     systemInstruction: 'You are a Networker. Write a short, polite LinkedIn connection request or email to ask a stranger for a virtual coffee chat.',
     placeholder: 'Person\'s role and reason for connecting...'
+  },
+  {
+    id: 'job-1',
+    name: 'Resignation Letter',
+    description: 'Leave on good terms.',
+    category: 'Career',
+    icon: 'DocumentText',
+    systemInstruction: 'You are a Professional Coach. Write a professional resignation letter. Keep it positive, brief, and helpful regarding the transition.',
+    placeholder: 'Role, Company, and Last Day...'
+  },
+  {
+    id: 'job-2',
+    name: 'LinkedIn Recommendation',
+    description: 'Write a review for a colleague.',
+    category: 'Career',
+    icon: 'UserCircle',
+    systemInstruction: 'You are a Professional. Write a glowing LinkedIn recommendation for a colleague, highlighting their specific strengths and a project you worked on together.',
+    placeholder: 'Colleague name, relationship, and key skills...'
+  },
+  {
+    id: 'job-3',
+    name: 'Interview Thank You',
+    description: 'Post-interview email.',
+    category: 'Career',
+    icon: 'ChatBubble',
+    systemInstruction: 'You are a Candidate. Write a thoughtful thank-you email to an interviewer. Reference a specific topic discussed during the interview.',
+    placeholder: 'Interviewer name and topic discussed...'
   },
 
   // --- Calculators & Utilities (Basic) ---
@@ -558,6 +679,53 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Code',
     systemInstruction: 'You are a Frontend Developer. Generate a React functional component (TypeScript) based on the description. Include props interface and basic Tailwind styling.',
     placeholder: 'Component description (e.g. User Card with avatar)...'
+  },
+
+  // --- Web Development (New) ---
+  {
+    id: 'web-1',
+    name: 'Website Audit Checklist',
+    description: 'Check UX, SEO, and Performance.',
+    category: 'Web Dev',
+    icon: 'Code',
+    systemInstruction: 'You are a Web Developer. Create a comprehensive checklist for auditing a website\'s health, covering UX/UI, SEO, Performance, and Accessibility (WCAG).',
+    placeholder: 'Site type (e.g. E-commerce, Blog)...'
+  },
+  {
+    id: 'web-2',
+    name: 'Sitemap Generator',
+    description: 'Create XML sitemap structure.',
+    category: 'Web Dev',
+    icon: 'Code',
+    systemInstruction: 'You are an SEO Specialist. Generate a standard XML sitemap structure for the list of pages provided.',
+    placeholder: 'List of page URLs...'
+  },
+  {
+    id: 'web-3',
+    name: 'Robots.txt Generator',
+    description: 'Control bot access.',
+    category: 'Web Dev',
+    icon: 'Code',
+    systemInstruction: 'You are a Webmaster. Generate a standard robots.txt file based on the user\'s requirements (allow/disallow paths).',
+    placeholder: 'Allow/Disallow rules...'
+  },
+  {
+    id: 'web-4',
+    name: 'Meta Tag Generator',
+    description: 'SEO-friendly head tags.',
+    category: 'Web Dev',
+    icon: 'Code',
+    systemInstruction: 'You are an SEO Expert. Generate the HTML <head> meta tags (Title, Description, Viewport, Charset, OG Tags) for the page described.',
+    placeholder: 'Page title and description...'
+  },
+  {
+    id: 'web-5',
+    name: 'Schema Markup Generator',
+    description: 'Create JSON-LD structured data.',
+    category: 'Web Dev',
+    icon: 'Code',
+    systemInstruction: 'You are a Schema.org Expert. Generate the JSON-LD structured data script for the specific content type described (e.g. Article, Product, Event).',
+    placeholder: 'Content type and details...'
   },
 
   // --- Business Math ---
@@ -1404,6 +1572,15 @@ export const TOOLS: ToolDefinition[] = [
     placeholder: 'Software name and type...'
   },
   {
+    id: 'leg-12',
+    name: 'Photography Release',
+    description: 'Permission to use photos.',
+    category: 'Legal',
+    icon: 'Scale',
+    systemInstruction: 'You are a Legal Assistant. Draft a standard Model Release Form for photography purposes.',
+    placeholder: 'Context of photo use...'
+  },
+  {
     id: 'leg-adv-1',
     name: 'MOU Template',
     description: 'Memorandum of Understanding.',
@@ -1598,6 +1775,24 @@ export const TOOLS: ToolDefinition[] = [
     systemInstruction: 'You are a Product Marketing Manager. Create a comprehensive product launch checklist covering Product, Marketing, Sales, and Support tasks.',
     placeholder: 'What product are you launching?'
   },
+  {
+    id: 'prod-7',
+    name: 'Deep Work Scheduler',
+    description: 'Plan focus blocks.',
+    category: 'Productivity',
+    icon: 'Clock',
+    systemInstruction: 'You are a Productivity Coach. Create a daily schedule optimized for "Deep Work" based on the user\'s peak hours and task list.',
+    placeholder: 'Tasks and peak energy times...'
+  },
+  {
+    id: 'prod-8',
+    name: 'Weekly Review Template',
+    description: 'Reflect on progress.',
+    category: 'Productivity',
+    icon: 'CheckCircle',
+    systemInstruction: 'You are a Coach. Create a template for a "Weekly Review" to help the user assess wins, losses, and plan for next week.',
+    placeholder: 'Just click Run...'
+  },
   
   // --- Operations ---
   {
@@ -1682,6 +1877,33 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Money',
     systemInstruction: 'You are a Wedding Planner. Provide a detailed budget breakdown for a wedding based on the total budget provided.',
     placeholder: 'Total budget and guest count...'
+  },
+  {
+    id: 'wed-1',
+    name: 'Best Man Speech',
+    description: 'Write a memorable toast.',
+    category: 'Wedding',
+    icon: 'Mic',
+    systemInstruction: 'You are a Speechwriter. Write a Best Man speech. Balance humor with sentimentality. Include a toast at the end.',
+    placeholder: 'Groom/Bride names and key memories...'
+  },
+  {
+    id: 'wed-2',
+    name: 'Maid of Honor Speech',
+    description: 'Write a touching toast.',
+    category: 'Wedding',
+    icon: 'Mic',
+    systemInstruction: 'You are a Speechwriter. Write a Maid of Honor speech. Focus on friendship, love, and well wishes.',
+    placeholder: 'Bride/Groom names and key memories...'
+  },
+  {
+    id: 'wed-3',
+    name: 'Wedding Vow Writer',
+    description: 'Personalized vows.',
+    category: 'Wedding',
+    icon: 'Heart',
+    systemInstruction: 'You are a Romantic Writer. Write personalized wedding vows based on the tone and relationship details provided.',
+    placeholder: 'Partner name and things you love about them...'
   },
 
   // --- Support ---
@@ -1798,6 +2020,24 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Briefcase',
     systemInstruction: 'You are a Professor. Create a course syllabus including weekly topics, reading lists, and grading criteria.',
     placeholder: 'Course subject...'
+  },
+  {
+    id: 'teach-1',
+    name: 'Report Card Comments',
+    description: 'Draft student feedback.',
+    category: 'Education',
+    icon: 'Pen',
+    systemInstruction: 'You are a Teacher. Write 3 report card comment options (Positive, Constructive, Neutral) for the student described.',
+    placeholder: 'Student strengths and weaknesses...'
+  },
+  {
+    id: 'teach-2',
+    name: 'Class Ice Breaker',
+    description: 'Fun activities for students.',
+    category: 'Education',
+    icon: 'Users',
+    systemInstruction: 'You are a Teacher. Suggest 3 fun, age-appropriate ice breaker activities for the first day of class.',
+    placeholder: 'Student age group...'
   },
 
   // --- Personal Growth & Finance ---
@@ -1919,6 +2159,24 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Pen',
     systemInstruction: 'You are a Writing Coach. Identify clichés in the text and suggest fresher, more original alternatives.',
     placeholder: 'Text to analyze...'
+  },
+  {
+    id: 'write-7',
+    name: 'Book Blurb Generator',
+    description: 'Write a compelling back cover.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are a Book Editor. Write a compelling back cover blurb for the book described. Focus on the hook and conflict.',
+    placeholder: 'Plot summary and genre...'
+  },
+  {
+    id: 'write-8',
+    name: 'Character Name Generator',
+    description: 'Unique names for fiction.',
+    category: 'Writing',
+    icon: 'Pen',
+    systemInstruction: 'You are a Novelist. Generate 10 unique character names suitable for the genre and setting described.',
+    placeholder: 'Genre and setting...'
   },
   {
     id: 'write-adv-1',
@@ -2608,26 +2866,6 @@ export const TOOLS: ToolDefinition[] = [
     placeholder: 'Service type (e.g. Web Design)...'
   },
 
-  // --- Real Estate (More) ---
-  {
-    id: 're-4',
-    name: 'Open House Checklist',
-    description: 'Prepare for a showing.',
-    category: 'Real Estate',
-    icon: 'Briefcase',
-    systemInstruction: 'You are a Realtor. Create a checklist of tasks to prepare a home for an Open House (Cleaning, Staging, Marketing).',
-    placeholder: 'Property type...'
-  },
-  {
-    id: 're-5',
-    name: 'Rent Increase Notice',
-    description: 'Formal notice to tenants.',
-    category: 'Real Estate',
-    icon: 'DocumentText',
-    systemInstruction: 'You are a Landlord. Write a formal, legally-sound (generic) notice of rent increase to a tenant. Check local laws reminder.',
-    placeholder: 'Current rent, New rent, Effective date...'
-  },
-
   // --- Language & Translation ---
   {
     id: 'lang-1',
@@ -2675,5 +2913,258 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Hammer',
     systemInstruction: 'You are a Contractor. Outline the steps, tools, and materials needed for the DIY project described.',
     placeholder: 'Project (e.g. Build a bookshelf)...'
+  },
+  {
+    id: 'pet-1',
+    name: 'Pet Sitter Instructions',
+    description: 'Care guide for sitters.',
+    category: 'Lifestyle',
+    icon: 'Heart',
+    systemInstruction: 'You are a Pet Owner. Create a detailed instruction sheet for a pet sitter, including feeding schedule, walk times, and vet contact.',
+    placeholder: 'Pet details and routine...'
+  },
+  {
+    id: 'pet-2',
+    name: 'Dog Training Plan',
+    description: 'Weekly training schedule.',
+    category: 'Lifestyle',
+    icon: 'CheckCircle',
+    systemInstruction: 'You are a Dog Trainer. Create a weekly training schedule for a dog to learn specific commands or modify behavior.',
+    placeholder: 'Dog age and goals...'
+  },
+
+  // --- Compliance (Advanced) ---
+  {
+    id: 'comp-1',
+    name: 'ISO 9001 Checklist',
+    description: 'Audit quality management.',
+    category: 'Compliance',
+    icon: 'Shield',
+    systemInstruction: 'You are a Quality Auditor. Create a high-level checklist for an internal ISO 9001 audit focusing on the process described.',
+    placeholder: 'Process or department...'
+  },
+  {
+    id: 'comp-2',
+    name: 'OSHA Audit Form',
+    description: 'Workplace safety check.',
+    category: 'Compliance',
+    icon: 'Shield',
+    systemInstruction: 'You are a Safety Inspector. Generate an OSHA compliance inspection checklist for the specific workplace environment described.',
+    placeholder: 'Workplace type (e.g. Warehouse, Office)...'
+  },
+  {
+    id: 'comp-3',
+    name: 'Data Processing Agreement',
+    description: 'GDPR DPA template.',
+    category: 'Compliance',
+    icon: 'Scale',
+    systemInstruction: 'You are a Legal Compliance Officer. Draft a standard Data Processing Agreement (DPA) structure for a vendor processing personal data.',
+    placeholder: 'Vendor role and data types...'
+  },
+  {
+    id: 'comp-4',
+    name: 'Accessibility Audit (WCAG)',
+    description: 'Check web accessibility.',
+    category: 'Compliance',
+    icon: 'Code',
+    systemInstruction: 'You are an Accessibility Expert. Create a checklist based on WCAG 2.1 Level AA standards for auditing the described web page component.',
+    placeholder: 'Component (e.g. Navigation Menu)...'
+  },
+  {
+    id: 'comp-5',
+    name: 'Vendor Due Diligence',
+    description: 'Vet new suppliers.',
+    category: 'Compliance',
+    icon: 'Search',
+    systemInstruction: 'You are a Procurement Manager. Create a due diligence questionnaire for onboarding a new critical vendor.',
+    placeholder: 'Vendor type...'
+  },
+
+  // --- Beauty & Wellness (Niche) ---
+  {
+    id: 'beauty-1',
+    name: 'Salon Service Menu',
+    description: 'Write service descriptions.',
+    category: 'Beauty',
+    icon: 'Scissors',
+    systemInstruction: 'You are a Salon Manager. Write attractive descriptions for a salon service menu. Focus on the experience and result.',
+    placeholder: 'List of services (e.g. Balayage, Gel Mani)...'
+  },
+  {
+    id: 'beauty-2',
+    name: 'Client Consultation Form',
+    description: 'Intake for new clients.',
+    category: 'Beauty',
+    icon: 'Users',
+    systemInstruction: 'You are an Esthetician. Create a client consultation form to assess skin type, allergies, and goals before treatment.',
+    placeholder: 'Treatment type...'
+  },
+  {
+    id: 'beauty-3',
+    name: 'Skincare Routine Gen',
+    description: 'Personalized regimens.',
+    category: 'Beauty',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Dermatologist Assistant. Create a Morning and Evening skincare routine based on the skin type and concerns provided.',
+    placeholder: 'Skin type and concerns...'
+  },
+  {
+    id: 'beauty-4',
+    name: 'Yoga Sequence Builder',
+    description: 'Plan a yoga class.',
+    category: 'Beauty',
+    icon: 'Sun',
+    systemInstruction: 'You are a Yoga Instructor. Create a 60-minute yoga flow sequence focused on the theme provided.',
+    placeholder: 'Theme (e.g. Hip Openers, Core)...'
+  },
+  {
+    id: 'beauty-5',
+    name: 'Salon Policy Sign',
+    description: 'Cancellation/Late rules.',
+    category: 'Beauty',
+    icon: 'Shield',
+    systemInstruction: 'You are a Business Owner. Write a polite but firm salon policy text regarding cancellations, late arrivals, and no-shows.',
+    placeholder: 'Your specific rules...'
+  },
+
+  // --- Food & Beverage (Niche) ---
+  {
+    id: 'fnb-1',
+    name: 'Recipe Costing Card',
+    description: 'Calculate plate cost.',
+    category: 'Food & Bev',
+    icon: 'Utensils',
+    systemInstruction: 'You are a Chef. Create a table template for costing a recipe, including Ingredient, Purchase Cost, Unit Cost, Usage, and Total Cost.',
+    placeholder: 'Dish name...'
+  },
+  {
+    id: 'fnb-2',
+    name: 'Food Safety Log',
+    description: 'Temp and cleaning logs.',
+    category: 'Food & Bev',
+    icon: 'Shield',
+    systemInstruction: 'You are a Health Inspector. Create a daily food safety log structure for tracking refrigerator temperatures and cleaning schedules.',
+    placeholder: 'Kitchen type...'
+  },
+  {
+    id: 'fnb-3',
+    name: 'Catering Proposal',
+    description: 'Pitch for events.',
+    category: 'Food & Bev',
+    icon: 'Briefcase',
+    systemInstruction: 'You are a Catering Manager. Write a professional catering proposal introduction and menu overview for the event described.',
+    placeholder: 'Event type and guest count...'
+  },
+  {
+    id: 'fnb-4',
+    name: 'Bar Inventory Sheet',
+    description: 'Track liquor stock.',
+    category: 'Food & Bev',
+    icon: 'Utensils',
+    systemInstruction: 'You are a Bar Manager. Create a bottle inventory sheet structure organized by Spirit type (Vodka, Gin, etc.).',
+    placeholder: 'Bar size...'
+  },
+  {
+    id: 'fnb-5',
+    name: 'Daily Special Generator',
+    description: 'Ideas for today\'s menu.',
+    category: 'Food & Bev',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Creative Chef. Suggest 3 "Daily Special" dish ideas based on the surplus ingredient provided.',
+    placeholder: 'Surplus ingredient (e.g. Tomatoes)...'
+  },
+
+  // --- Mental Models (Decision Making) ---
+  {
+    id: 'model-1',
+    name: 'Second-Order Thinking',
+    description: 'Analyze long-term consequences.',
+    category: 'Mental Models',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Strategic Thinker. Apply Second-Order Thinking to the decision provided. What are the immediate consequences? What are the consequences of those consequences?',
+    placeholder: 'Decision to be made...'
+  },
+  {
+    id: 'model-2',
+    name: 'Inversion Principle',
+    description: 'Solve by avoiding failure.',
+    category: 'Mental Models',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Problem Solver. Apply the Inversion Principle. Instead of asking how to achieve success in the goal described, list how to guarantee failure, then flip it.',
+    placeholder: 'Goal...'
+  },
+  {
+    id: 'model-3',
+    name: 'Pareto Analysis (80/20)',
+    description: 'Find the vital few.',
+    category: 'Mental Models',
+    icon: 'Chart',
+    systemInstruction: 'You are an Efficiency Expert. Help the user apply the Pareto Principle (80/20 Rule) to the list of inputs provided. Identify the likely top 20% drivers.',
+    placeholder: 'List of tasks/problems/customers...'
+  },
+  {
+    id: 'model-4',
+    name: 'Regret Minimization',
+    description: 'Project forward to old age.',
+    category: 'Mental Models',
+    icon: 'Sparkles',
+    systemInstruction: 'You are a Life Coach. Apply the Regret Minimization Framework. Ask the user to project themselves to age 80 and view the decision from that perspective.',
+    placeholder: 'Big life decision...'
+  },
+  {
+    id: 'model-5',
+    name: 'Six Thinking Hats',
+    description: 'View from multiple angles.',
+    category: 'Mental Models',
+    icon: 'Users',
+    systemInstruction: 'You are a Facilitator. Analyze the problem using De Bono\'s Six Thinking Hats (White, Red, Black, Yellow, Green, Blue). Summarize the view from each hat.',
+    placeholder: 'Problem or proposal...'
+  },
+
+  // --- Event Management (Advanced) ---
+  {
+    id: 'evt-adv-1',
+    name: 'Seating Chart Planner',
+    description: 'Organize guests strategically.',
+    category: 'Events',
+    icon: 'Users',
+    systemInstruction: 'You are a Wedding Planner. Provide advice and a logical grouping strategy for creating a seating chart for the guests described.',
+    placeholder: 'Guest count and table size...'
+  },
+  {
+    id: 'evt-adv-2',
+    name: 'Vendor Contact List',
+    description: 'Track event suppliers.',
+    category: 'Events',
+    icon: 'Briefcase',
+    systemInstruction: 'You are an Event Producer. Create a template for a Master Vendor Contact List including category, contact name, phone, arrival time, and notes.',
+    placeholder: 'Event type...'
+  },
+  {
+    id: 'evt-adv-3',
+    name: 'Conference Badge Strategy',
+    description: 'Categorize attendees.',
+    category: 'Events',
+    icon: 'Tag',
+    systemInstruction: 'You are a Conference Organizer. Suggest a color-coding or categorization strategy for attendee badges to facilitate networking.',
+    placeholder: 'Attendee types (e.g. VIP, Speaker, Student)...'
+  },
+  {
+    id: 'evt-adv-4',
+    name: 'Post-Event Survey',
+    description: 'Gather attendee feedback.',
+    category: 'Events',
+    icon: 'ChatBubble',
+    systemInstruction: 'You are a Marketing Manager. Draft 5 key questions for a post-event feedback survey to measure satisfaction and NPS.',
+    placeholder: 'Event goals...'
+  },
+  {
+    id: 'evt-adv-5',
+    name: 'Sponsorship Tiers',
+    description: 'Packages for event sponsors.',
+    category: 'Events',
+    icon: 'Money',
+    systemInstruction: 'You are a Sponsorship Director. Outline Gold, Silver, and Bronze sponsorship packages for the event described, with specific benefits.',
+    placeholder: 'Event description and audience...'
   }
 ];

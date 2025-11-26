@@ -37,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
     {
       title: 'Management',
       items: [
+        { id: AppTool.CALENDAR, label: 'Calendar', icon: Icons.CalendarDays },
         { id: AppTool.PROJECTS, label: 'Projects', icon: Icons.Board },
         { id: AppTool.CRM, label: 'Contacts (CRM)', icon: Icons.Identification },
         { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },

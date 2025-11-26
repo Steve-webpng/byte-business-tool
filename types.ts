@@ -10,6 +10,7 @@ export enum AppTool {
   FILE_CHAT = 'FILE_CHAT',
   VOICE_NOTES = 'VOICE_NOTES',
   CRM = 'CRM',
+  CALENDAR = 'CALENDAR',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
   ANALYSIS = 'ANALYSIS',
@@ -142,4 +143,15 @@ export interface Contact {
   role: string;
   status: ContactStatus;
   notes: string;
+}
+
+// Calendar
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string; // ISO String
+  end: string; // ISO String
+  description?: string;
+  contactId?: number; // Link to CRM
+  type: 'meeting' | 'task' | 'deadline';
 }

@@ -614,6 +614,30 @@ export const transcribeAndSummarizeAudio = async (
     return JSON.parse(jsonText);
 };
 
+// --- Realistic Text-to-Speech (TTS) ---
+export const generateSpeech = async (text: string, voice: string = 'Kore'): Promise<string> => {
+  const ai = getAIClient();
+  
+  // Use specialized TTS model
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: voice },
+        },
+      },
+    },
+  });
+
+  const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!audioData) throw new Error("No audio generated.");
+  
+  return audioData;
+};
+
 export const analyzeSessionTranscript = async (transcript: TranscriptItem[]): Promise<string> => {
   const ai = getAIClient();
   const conversation = transcript.map(t => `${t.role.toUpperCase()}: ${t.text}`).join('\n');

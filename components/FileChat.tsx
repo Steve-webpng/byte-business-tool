@@ -6,9 +6,6 @@ import { streamChat } from '../services/geminiService';
 import { useToast } from './ToastContainer';
 import MarkdownRenderer from './MarkdownRenderer';
 
-// Configure the worker for pdf.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
 const FileChat: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
@@ -17,6 +14,17 @@ const FileChat: React.FC = () => {
   const [loading, setLoading] = useState<'idle' | 'parsing' | 'thinking'>('idle');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
+
+  useEffect(() => {
+    // Initialize PDF worker safely
+    try {
+        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        }
+    } catch (e) {
+        console.warn("PDF Worker Init Warning:", e);
+    }
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,16 +42,22 @@ const FileChat: React.FC = () => {
         if (selectedFile.type === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
-                const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                let fullText = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    fullText += textContent.items.map(item => ('str' in item) ? item.str : '').join(' ');
+                try {
+                    const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        fullText += textContent.items.map((item: any) => item.str).join(' ');
+                    }
+                    setExtractedText(fullText);
+                    toast.show("PDF processed successfully!", "success");
+                } catch (err) {
+                    console.error("PDF Parsing Error:", err);
+                    toast.show("Failed to parse PDF content.", "error");
+                    setFile(null);
                 }
-                setExtractedText(fullText);
-                toast.show("PDF processed successfully!", "success");
             };
             reader.readAsArrayBuffer(selectedFile);
         } else if (selectedFile.type === 'text/plain') {
@@ -55,7 +69,7 @@ const FileChat: React.FC = () => {
             setFile(null);
         }
     } catch(e) {
-        toast.show("Failed to parse the file.", "error");
+        toast.show("Failed to read file.", "error");
         setFile(null);
     } finally {
         setLoading('idle');

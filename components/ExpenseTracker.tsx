@@ -71,20 +71,19 @@ const ExpenseTracker: React.FC = () => {
     };
 
     const chartData = useMemo(() => {
-        const categoryTotals = expenses.reduce((acc, expense) => {
+        const categoryTotals = expenses.reduce((acc: Record<string, number>, expense) => {
             const cat = expense.category || 'Uncategorized';
-            // FIX: Ensure expense.amount is treated as a number to prevent string concatenation.
-            acc[cat] = (acc[cat] || 0) + Number(expense.amount);
+            const currentAmount = acc[cat] || 0;
+            acc[cat] = currentAmount + Number(expense.amount);
             return acc;
         }, {} as Record<string, number>);
 
         return Object.entries(categoryTotals)
             .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
+            .sort((a, b) => Number(b.value) - Number(a.value));
     }, [expenses]);
 
     const totalSpent = useMemo(() => {
-        // FIX: Ensure expense amount is treated as a number for correct summation.
         return expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     }, [expenses]);
     

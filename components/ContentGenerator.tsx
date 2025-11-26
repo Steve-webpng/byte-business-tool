@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { generateMarketingContent, generateMarketingCampaign, generateImage } from '../services/geminiService';
+import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData } from '../services/geminiService';
 import { saveItem, getSupabaseConfig, getSavedItems } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
 import { MarketingCampaign, SavedItem, AppTool } from '../types';
 import { Icons } from '../constants';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useToast } from './ToastContainer';
 
 interface ContentGeneratorProps {
   isWidget?: boolean;
@@ -12,6 +13,8 @@ interface ContentGeneratorProps {
   clearWorkflowData?: () => void;
   onWorkflowSend?: (targetTool: AppTool, data: string) => void;
 }
+
+const VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
 
 const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, workflowData, clearWorkflowData, onWorkflowSend }) => {
   const [topic, setTopic] = useState('');
@@ -27,29 +30,177 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Audio state
   const [speaking, setSpeaking] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState('Kore');
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   const [isDictating, setIsDictating] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (workflowData && clearWorkflowData) {
       setTopic(workflowData);
       clearWorkflowData();
     }
+    refreshHistory();
   }, [workflowData, clearWorkflowData]);
 
-  // ... (rest of functions are mostly unchanged)
+  // Cleanup audio on unmount
+  useEffect(() => {
+      return () => {
+          if (audioSourceRef.current) audioSourceRef.current.stop();
+          if (audioCtxRef.current) audioCtxRef.current.close();
+      };
+  }, []);
+
+  const refreshHistory = async () => {
+      const items = await getSavedItems();
+      setRecentDrafts(items.filter(i => i.tool_type === 'Content').slice(0, 5));
+  }
 
   const handleGenerate = async () => {
     if (!topic) return;
     setLoading(true);
-    // ...
+    setGeneratedText('');
+    setGeneratedImage('');
+    setCampaign(null);
+    
+    try {
+      const profile = getProfile();
+      const context = formatProfileForPrompt(profile);
+      const finalTone = customTone || tone;
+
+      if (mode === 'Image') {
+          const imgBase64 = await generateImage(topic);
+          setGeneratedImage(imgBase64);
+      } else if (mode === 'Campaign') {
+          const camp = await generateMarketingCampaign(topic, finalTone, context);
+          setCampaign(camp);
+          setActiveTab('email');
+      } else {
+          const text = await generateMarketingContent(topic, type, finalTone, context);
+          setGeneratedText(text);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.show("Generation failed. Please try again.", "error");
+    } finally {
+      setLoading(false);
+    }
   };
-  const handleSave = async () => { /* ... */ };
-  const downloadImage = () => { /* ... */ };
-  const handleSpeak = () => { /* ... */ };
-  const stopSpeaking = () => { /* ... */ };
-  const toggleDictation = () => { /* ... */ };
+
+  const handleSave = async () => {
+    setSaving(true);
+    let contentToSave = '';
+    let title = topic.substring(0, 30);
+
+    if (mode === 'Single') contentToSave = generatedText;
+    else if (mode === 'Campaign') contentToSave = JSON.stringify(campaign, null, 2);
+    else if (mode === 'Image') contentToSave = generatedImage;
+
+    if (!contentToSave) return;
+
+    const res = await saveItem('Content', title, contentToSave);
+    if (res.success) {
+        toast.show("Content saved successfully!", "success");
+        refreshHistory();
+    } else {
+        toast.show(`Failed to save: ${res.error}`, "error");
+    }
+    setSaving(false);
+  };
+
+  const downloadImage = () => {
+      if (!generatedImage) return;
+      const link = document.createElement('a');
+      link.href = generatedImage;
+      link.download = `generated-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  // --- Realistic TTS Logic ---
+  const handleSpeak = async () => {
+      if (speaking) {
+          stopSpeaking();
+          return;
+      }
+
+      let textToSpeak = '';
+      if (mode === 'Single') textToSpeak = generatedText;
+      else if (mode === 'Campaign' && campaign) {
+          if (activeTab === 'email') textToSpeak = campaign.emailBody;
+          else if (activeTab === 'linkedin') textToSpeak = campaign.linkedinPost;
+          else if (activeTab === 'twitter') textToSpeak = campaign.twitterThread.join('. ');
+      }
+
+      // Clean markdown
+      textToSpeak = textToSpeak.replace(/[*#_\[\]|]/g, ' ').replace(/<[^>]*>?/gm, '');
+
+      if (!textToSpeak) return;
+
+      setAudioLoading(true);
+      try {
+          const base64Audio = await generateSpeech(textToSpeak, selectedVoice);
+          
+          if (!audioCtxRef.current) {
+              audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
+          }
+          
+          const buffer = await decodeAudioData(decodeAudio(base64Audio), audioCtxRef.current, 24000, 1);
+          
+          if (audioSourceRef.current) audioSourceRef.current.stop();
+          audioSourceRef.current = audioCtxRef.current.createBufferSource();
+          audioSourceRef.current.buffer = buffer;
+          audioSourceRef.current.connect(audioCtxRef.current.destination);
+          audioSourceRef.current.onended = () => setSpeaking(false);
+          audioSourceRef.current.start();
+          
+          setSpeaking(true);
+      } catch (e) {
+          console.error(e);
+          toast.show("Failed to generate speech.", "error");
+      } finally {
+          setAudioLoading(false);
+      }
+  };
+
+  const stopSpeaking = () => {
+      if (audioSourceRef.current) {
+          audioSourceRef.current.stop();
+      }
+      setSpeaking(false);
+  };
+
+  const toggleDictation = () => {
+      if (isDictating) {
+          if (recognitionRef.current) recognitionRef.current.stop();
+          setIsDictating(false);
+      } else {
+          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (!SpeechRecognition) {
+              toast.show("Speech recognition not supported in this browser.", "error");
+              return;
+          }
+          const recognition = new SpeechRecognition();
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.onresult = (event: any) => {
+              const transcript = event.results[0][0].transcript;
+              setTopic(prev => prev + (prev ? " " : "") + transcript);
+              setIsDictating(false);
+          };
+          recognition.start();
+          setIsDictating(true);
+          recognitionRef.current = recognition;
+      }
+  };
 
   return (
     <div className={`h-full flex flex-col ${isWidget ? '' : 'max-w-6xl mx-auto'}`}>
@@ -61,7 +212,27 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
           </div>
           <div className="flex items-center gap-3">
              <div className="relative">
-                 {/* ... History button ... */}
+                 <button 
+                    onClick={() => setShowHistory(!showHistory)} 
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400"
+                    title="History"
+                 >
+                     <Icons.History />
+                 </button>
+                 {showHistory && (
+                     <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-20 overflow-hidden">
+                         <div className="p-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Recent Drafts</div>
+                         {recentDrafts.map(d => (
+                             <button 
+                                key={d.id}
+                                onClick={() => { setGeneratedText(d.content); setShowHistory(false); }}
+                                className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 last:border-0 truncate"
+                             >
+                                 {d.title}
+                             </button>
+                         ))}
+                     </div>
+                 )}
              </div>
              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                 <button 
@@ -97,18 +268,90 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
       <div className={`grid ${isWidget ? 'grid-cols-1 gap-4' : 'grid-cols-1 lg:grid-cols-12 gap-6'} flex-1 min-h-0`}>
         {/* Controls */}
         <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col ${isWidget ? 'p-3' : 'p-6 h-fit lg:col-span-4'}`}>
-          { /* ... Form elements ... */ }
+          
+          {mode !== 'Image' && (
+              <>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Format</label>
+                        <select 
+                            value={type}
+                            onChange={(e) => setType(e.target.value)}
+                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
+                        >
+                            <option>Email</option>
+                            <option>LinkedIn Post</option>
+                            <option>Twitter Thread</option>
+                            <option>Blog Post</option>
+                            <option>Press Release</option>
+                            <option>Ad Copy</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Tone</label>
+                        <select 
+                            value={tone}
+                            onChange={(e) => { setTone(e.target.value); if(e.target.value !== 'Custom') setCustomTone(''); }}
+                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
+                        >
+                            <option>Professional</option>
+                            <option>Friendly</option>
+                            <option>Persuasive</option>
+                            <option>Witty</option>
+                            <option>Urgent</option>
+                            <option>Custom</option>
+                        </select>
+                    </div>
+                </div>
+                {tone === 'Custom' && (
+                    <div className="mb-4">
+                        <input 
+                            type="text" 
+                            value={customTone}
+                            onChange={(e) => setCustomTone(e.target.value)}
+                            placeholder="e.g. 'Like Steve Jobs'"
+                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 outline-none"
+                        />
+                    </div>
+                )}
+              </>
+          )}
+
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Topic / Prompt</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 flex justify-between">
+                  <span>Topic / Prompt</span>
+                  <button onClick={toggleDictation} className={`${isDictating ? 'text-red-500 animate-pulse' : 'text-slate-400 hover:text-blue-500'}`} title="Dictate">
+                      <Icons.Mic />
+                  </button>
+              </label>
               <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                className={`w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50 dark:bg-slate-900 ${isWidget ? 'h-20 text-sm' : 'min-h-[140px]'}`}
-                placeholder={"e.g. Announce a summer sale..."}
+                className={`w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 ${isWidget ? 'h-20 text-sm' : 'min-h-[140px]'}`}
+                placeholder={isDictating ? "Listening..." : "e.g. Announce a summer sale..."}
               />
             </div>
-            {/* ... other controls ... */}
+
+            <button
+                onClick={handleGenerate}
+                disabled={loading || !topic}
+                className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg
+                    ${loading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 
+                      mode === 'Image' ? 'bg-pink-600 hover:bg-pink-700' : 
+                      mode === 'Campaign' ? 'bg-purple-600 hover:bg-purple-700' :
+                      'bg-blue-600 hover:bg-blue-700'
+                    }`}
+            >
+                {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Generating...
+                    </span>
+                ) : (
+                    mode === 'Image' ? 'Generate Image' : 'Generate Content'
+                )}
+            </button>
           </div>
         </div>
 
@@ -118,7 +361,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
             <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase tracking-wide flex items-center gap-2">
                 {mode === 'Image' ? <Icons.Photo /> : <Icons.DocumentText />} Result
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
                  {onWorkflowSend && (generatedText || campaign) && (
                     <button onClick={() => {
                         let data = generatedText;
@@ -134,13 +377,100 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                         <Icons.Share /> Send to Doc
                     </button>
                  )}
-                 { /* ... Other buttons: Speak, Save, Download, Copy ... */ }
+                 
+                 {(generatedText || campaign) && (
+                     <div className="flex items-center bg-slate-50 dark:bg-slate-700/50 rounded-lg p-0.5 border border-slate-200 dark:border-slate-600 ml-2">
+                         <select 
+                            value={selectedVoice} 
+                            onChange={(e) => setSelectedVoice(e.target.value)}
+                            className="bg-transparent text-xs font-bold text-slate-600 dark:text-slate-300 outline-none px-2 py-1"
+                         >
+                             {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                         </select>
+                         <button
+                            onClick={handleSpeak}
+                            disabled={audioLoading}
+                            className={`flex items-center justify-center w-8 h-7 rounded-md transition-all ${speaking ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-white dark:hover:bg-slate-600 hover:text-blue-600'}`}
+                            title="Read Aloud"
+                         >
+                             {audioLoading ? (
+                                 <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                             ) : (
+                                 speaking ? <div className="w-2 h-2 bg-white rounded-sm"></div> : <Icons.SpeakerWave />
+                             )}
+                         </button>
+                     </div>
+                 )}
+
+                 {getSupabaseConfig() && (generatedText || campaign || generatedImage) && (
+                    <button 
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 text-xs font-bold bg-emerald-50 dark:bg-emerald-900/50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                        {saving ? 'Saving...' : <><Icons.Save /> SAVE</>}
+                    </button>
+                 )}
+                 {generatedImage && (
+                     <button 
+                        onClick={downloadImage}
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-bold bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                     >
+                         <Icons.Download />
+                     </button>
+                 )}
             </div>
           </div>
 
-          {/* ... Campaign Tabs and Output area ... */}
           <div className="flex-1 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-6 overflow-y-auto">
-            {/* ... render logic ... */}
+            {mode === 'Image' ? (
+                generatedImage ? (
+                    <div className="flex items-center justify-center h-full">
+                        <img src={generatedImage} alt="Generated" className="max-h-full max-w-full rounded-lg shadow-lg" />
+                    </div>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                        <Icons.Photo />
+                        <p className="text-sm mt-2">Image will appear here</p>
+                    </div>
+                )
+            ) : mode === 'Campaign' && campaign ? (
+                <div className="flex flex-col h-full">
+                    <div className="flex gap-2 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <button onClick={() => setActiveTab('email')} className={`px-3 py-1 text-sm font-bold rounded-md ${activeTab === 'email' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Email</button>
+                        <button onClick={() => setActiveTab('linkedin')} className={`px-3 py-1 text-sm font-bold rounded-md ${activeTab === 'linkedin' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>LinkedIn</button>
+                        <button onClick={() => setActiveTab('twitter')} className={`px-3 py-1 text-sm font-bold rounded-md ${activeTab === 'twitter' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Twitter</button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                        {activeTab === 'email' && (
+                            <div>
+                                <div className="font-bold text-slate-700 dark:text-slate-300 mb-2">Subject: {campaign.emailSubject}</div>
+                                <MarkdownRenderer content={campaign.emailBody} />
+                            </div>
+                        )}
+                        {activeTab === 'linkedin' && <MarkdownRenderer content={campaign.linkedinPost} />}
+                        {activeTab === 'twitter' && (
+                            <div className="space-y-4">
+                                {campaign.twitterThread.map((tweet, i) => (
+                                    <div key={i} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300">
+                                        <div className="text-xs font-bold text-slate-400 mb-1">Tweet {i+1}/{campaign.twitterThread.length}</div>
+                                        {tweet}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                generatedText ? (
+                    <MarkdownRenderer content={generatedText} />
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                        <div className="mb-2 text-slate-300 dark:text-slate-600"><Icons.DocumentText /></div>
+                        <p className="italic">Output will appear here...</p>
+                    </div>
+                )
+            )}
           </div>
         </div>
       </div>

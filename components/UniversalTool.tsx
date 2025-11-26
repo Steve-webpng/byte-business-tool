@@ -1,8 +1,6 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ToolDefinition } from '../types';
-import { runGenericTool } from '../services/geminiService';
+import { runGenericTool, generateSpeech, decodeAudio, decodeAudioData } from '../services/geminiService';
 import { MANUAL_TOOLS } from '../services/manualLogic';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
@@ -14,6 +12,8 @@ interface UniversalToolProps {
   tool: ToolDefinition;
   onBack: () => void;
 }
+
+const VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
 
 const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
   const [input, setInput] = useState('');
@@ -29,6 +29,11 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
   
   // Audio State
   const [speaking, setSpeaking] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState('Kore');
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   const [isDictating, setIsDictating] = useState(false);
   const recognitionRef = useRef<any>(null);
 
@@ -40,6 +45,14 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
       setOutput('');
       stopSpeaking();
   }, [tool.id, manualConfig]);
+
+  // Cleanup audio
+  useEffect(() => {
+      return () => {
+          if (audioSourceRef.current) audioSourceRef.current.stop();
+          if (audioCtxRef.current) audioCtxRef.current.close();
+      };
+  }, []);
 
   const IconComponent = Icons[tool.icon] || Icons.Grid;
 
@@ -95,22 +108,47 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
       if (textarea) textarea.focus();
   };
 
-  // --- Audio Handlers ---
-  const handleSpeak = () => {
+  // --- Realistic TTS Handlers ---
+  const handleSpeak = async () => {
       if (speaking) {
           stopSpeaking();
           return;
       }
       if (!output) return;
+
       const cleanText = output.replace(/[*#_\[\]|]/g, ' ').replace(/<[^>]*>?/gm, '');
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.onend = () => setSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-      setSpeaking(true);
+      if (!cleanText.trim()) return;
+
+      setAudioLoading(true);
+      try {
+          const base64Audio = await generateSpeech(cleanText, selectedVoice);
+          
+          if (!audioCtxRef.current) {
+              audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
+          }
+          
+          const buffer = await decodeAudioData(decodeAudio(base64Audio), audioCtxRef.current, 24000, 1);
+          
+          if (audioSourceRef.current) audioSourceRef.current.stop();
+          audioSourceRef.current = audioCtxRef.current.createBufferSource();
+          audioSourceRef.current.buffer = buffer;
+          audioSourceRef.current.connect(audioCtxRef.current.destination);
+          audioSourceRef.current.onended = () => setSpeaking(false);
+          audioSourceRef.current.start();
+          
+          setSpeaking(true);
+      } catch (e) {
+          console.error(e);
+          toast.show("Failed to generate speech.", "error");
+      } finally {
+          setAudioLoading(false);
+      }
   };
 
   const stopSpeaking = () => {
-      window.speechSynthesis.cancel();
+      if (audioSourceRef.current) {
+          audioSourceRef.current.stop();
+      }
       setSpeaking(false);
   };
 
@@ -263,15 +301,29 @@ const UniversalTool: React.FC<UniversalToolProps> = ({ tool, onBack }) => {
                     <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                         <Icons.DocumentText /> Result
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                         {output && (
-                             <button
-                                onClick={handleSpeak}
-                                className={`text-xs flex items-center gap-1 font-medium border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-colors ${speaking ? 'text-red-600 bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700' : 'text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                title="Read Aloud"
-                             >
-                                 {speaking ? <Icons.StopCircle /> : <Icons.SpeakerWave />}
-                             </button>
+                             <div className="flex items-center bg-slate-50 dark:bg-slate-700/50 rounded-lg p-0.5 border border-slate-200 dark:border-slate-600 mr-2">
+                                 <select 
+                                    value={selectedVoice} 
+                                    onChange={(e) => setSelectedVoice(e.target.value)}
+                                    className="bg-transparent text-xs font-bold text-slate-600 dark:text-slate-300 outline-none px-2 py-1"
+                                 >
+                                     {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                                 </select>
+                                 <button
+                                    onClick={handleSpeak}
+                                    disabled={audioLoading}
+                                    className={`flex items-center justify-center w-8 h-7 rounded-md transition-all ${speaking ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-white dark:hover:bg-slate-600 hover:text-blue-600'}`}
+                                    title="Read Aloud"
+                                 >
+                                     {audioLoading ? (
+                                         <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                                     ) : (
+                                         speaking ? <div className="w-2 h-2 bg-white rounded-sm"></div> : <Icons.SpeakerWave />
+                                     )}
+                                 </button>
+                             </div>
                         )}
                         {output && mode === 'ai' && (
                             <button

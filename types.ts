@@ -13,6 +13,7 @@ export enum AppTool {
   CALENDAR = 'CALENDAR',
   EXPENSE_TRACKER = 'EXPENSE_TRACKER',
   INVOICES = 'INVOICES',
+  ACADEMY = 'ACADEMY',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
   ANALYSIS = 'ANALYSIS',
@@ -210,4 +211,31 @@ export interface SEOResult {
     keywords: string[];
     suggestions: string[];
     readability: string;
+}
+
+// Academy
+export interface Course {
+    id: string;
+    title: string;
+    description: string;
+    modules: CourseModule[];
+    totalLessons: number;
+    completedLessons: number;
+}
+
+export interface CourseModule {
+    title: string;
+    lessons: Lesson[];
+}
+
+export interface Lesson {
+    id: string;
+    title: string;
+    isCompleted: boolean;
+    content?: string; // Markdown content loaded on demand
+    quiz?: {
+        question: string;
+        options: string[];
+        correctAnswer: number;
+    };
 }

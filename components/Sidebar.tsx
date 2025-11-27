@@ -60,6 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
       items: [
         { id: AppTool.RESEARCH, label: 'Market Research', icon: Icons.Search },
         { id: AppTool.ANALYSIS, label: 'Data Analysis', icon: Icons.Chart },
+        { id: AppTool.ACADEMY, label: 'Business Academy', icon: Icons.AcademicCap },
         { id: AppTool.FILE_CHAT, label: 'File Chat', icon: Icons.Upload },
         { id: AppTool.COACH, label: 'Sales Coach', icon: Icons.Mic },
         { id: AppTool.FOCUS, label: 'Focus Timer', icon: Icons.Clock },

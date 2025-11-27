@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 import { getSavedItems } from "./supabaseService";
 
@@ -827,6 +827,127 @@ export const analyzeSessionTranscript = async (transcript: TranscriptItem[]): Pr
   });
 
   return response.text || "Unable to analyze session. Please try again.";
+};
+
+// --- Academy & Learning ---
+export const generateCourseSyllabus = async (topic: string): Promise<Course> => {
+    const ai = getAIClient();
+    const prompt = `
+      Create a comprehensive course syllabus for the topic: "${topic}".
+      
+      Structure:
+      1. Title: A catchy title for the course.
+      2. Description: Brief overview (1-2 sentences).
+      3. Modules: 3-5 modules.
+      4. Lessons: 2-4 lessons per module.
+      
+      Return STRICT JSON format conforming to the Course structure.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    modules: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                title: { type: Type.STRING },
+                                lessons: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            title: { type: Type.STRING }
+                                        },
+                                        required: ["title"]
+                                    }
+                                }
+                            },
+                            required: ["title", "lessons"]
+                        }
+                    }
+                },
+                required: ["title", "description", "modules"]
+            }
+        }
+    });
+
+    const data = JSON.parse(response.text || "{}");
+    
+    // Hydrate with IDs and defaults
+    const course: Course = {
+        id: `course-${Date.now()}`,
+        title: data.title,
+        description: data.description,
+        modules: data.modules.map((m: any) => ({
+            title: m.title,
+            lessons: m.lessons.map((l: any) => ({
+                id: `lesson-${Math.random().toString(36).substr(2,9)}`,
+                title: l.title,
+                isCompleted: false
+            }))
+        })),
+        totalLessons: 0,
+        completedLessons: 0
+    };
+    
+    // Calc totals
+    course.totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
+    
+    return course;
+};
+
+export const generateLessonContent = async (courseTitle: string, lessonTitle: string): Promise<{content: string, quiz: any}> => {
+    const ai = getAIClient();
+    const prompt = `
+      Write a detailed educational lesson about "${lessonTitle}" for the course "${courseTitle}".
+      
+      Part 1: The Lesson Content (Markdown).
+      - Use headers, bullet points, and bold text.
+      - Explain concepts clearly with examples.
+      - Keep it engaging.
+      
+      Part 2: A Quiz.
+      - One multiple choice question to test understanding.
+      - 3 options.
+      - Index of correct answer (0, 1, or 2).
+      
+      Return JSON.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    content: { type: Type.STRING },
+                    quiz: {
+                        type: Type.OBJECT,
+                        properties: {
+                            question: { type: Type.STRING },
+                            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            correctAnswer: { type: Type.INTEGER }
+                        },
+                        required: ["question", "options", "correctAnswer"]
+                    }
+                },
+                required: ["content", "quiz"]
+            }
+        }
+    });
+
+    return JSON.parse(response.text || "{}");
 };
 
 // --- Live API Helpers ---

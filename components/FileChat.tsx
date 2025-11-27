@@ -32,26 +32,34 @@ const FileChat: React.FC = () => {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
-                    // Dynamically import PDF.js only when needed to prevent bundle crash
+                    // Dynamically import PDF.js to avoid bundle issues if not used
                     const pdfjsLib = await import('pdfjs-dist');
                     
+                    // Set worker source to a CDN to avoid local bundling issues with the worker file
                     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
                         pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
                     }
 
                     const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
                     const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    
                     let fullText = '';
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
-                        fullText += textContent.items.map((item: any) => item.str).join(' ');
+                        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                        fullText += pageText + '\n';
                     }
+                    
+                    if (!fullText.trim()) {
+                        throw new Error("No text found in PDF. It might be an image scan.");
+                    }
+
                     setExtractedText(fullText);
                     toast.show("PDF processed successfully!", "success");
-                } catch (err) {
+                } catch (err: any) {
                     console.error("PDF Parsing Error:", err);
-                    toast.show("Failed to parse PDF content.", "error");
+                    toast.show(err.message || "Failed to parse PDF content.", "error");
                     setFile(null);
                 }
             };
@@ -90,7 +98,7 @@ const FileChat: React.FC = () => {
 
     try {
         const systemInstruction = `You are an expert document analyst. The user has uploaded a document with the following content. Your task is to answer questions based ONLY on the information provided in this document. Do not use external knowledge unless specifically asked. If the answer is not in the document, say so.
-        \n--- DOCUMENT START ---\n${extractedText}\n--- DOCUMENT END ---`;
+        \n--- DOCUMENT START ---\n${extractedText.substring(0, 30000)}\n--- DOCUMENT END ---\n(Note: Text may be truncated if too long)`;
         
         const aiMsgPlaceholder: ChatMessage = { role: 'model', text: '', timestamp: new Date() };
         setMessages(prev => [...prev, aiMsgPlaceholder]);

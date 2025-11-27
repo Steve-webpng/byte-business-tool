@@ -22,6 +22,7 @@ import AudioStudio from './components/AudioStudio';
 import CalendarView from './components/CalendarView';
 import ExpenseTracker from './components/ExpenseTracker';
 import InvoiceBuilder from './components/InvoiceBuilder';
+import BusinessAcademy from './components/BusinessAcademy';
 import CommandPalette from './components/CommandPalette';
 import { AppTool, ToolDefinition, Task } from './types';
 import { Icons } from './constants';
@@ -137,6 +138,8 @@ const AppContent: React.FC = () => {
         return <VoiceNotes onAddTask={handleAddTask} />;
       case AppTool.AUDIO_STUDIO:
         return <AudioStudio />;
+      case AppTool.ACADEMY:
+        return <BusinessAcademy />;
       case AppTool.FOCUS:
         return <FocusTimer />;
       case AppTool.LIBRARY:

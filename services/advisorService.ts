@@ -2,6 +2,8 @@
 import { getProfile } from './settingsService';
 import { getSavedItems, getDeals, getExpenses, getContacts, getInvoices } from './supabaseService';
 import { Task, Invoice } from '../types';
+import { getEvents } from './calendarService';
+import { isToday, isPast, parseISO } from 'date-fns';
 
 export const getAdvisorContext = async (): Promise<string> => {
   const profile = getProfile();
@@ -83,3 +85,40 @@ export const getAdvisorContext = async (): Promise<string> => {
 
   return context;
 };
+
+export const getDailyContext = async (): Promise<string> => {
+    const profile = getProfile();
+    const today = new Date();
+    
+    // Tasks
+    const savedBoard = localStorage.getItem('byete_current_board_state');
+    const tasks: Task[] = savedBoard ? JSON.parse(savedBoard) : [];
+    const tasksDue = tasks.filter(t => t.columnId !== 'done' && t.dueDate && (isToday(parseISO(t.dueDate)) || isPast(parseISO(t.dueDate))));
+    
+    // Calendar
+    const events = getEvents();
+    const todayEvents = events.filter(e => isToday(parseISO(e.start)));
+    
+    // Invoices
+    const invoices = await getInvoices();
+    const overdueInvoices = invoices.filter(i => i.status === 'Overdue');
+
+    let context = `Today is ${today.toLocaleDateString()}.
+    
+    Business: ${profile?.name || 'My Business'}
+    User Role: Owner/Executive
+    
+    -- TODAY'S AGENDA --
+    
+    📅 EVENTS TODAY (${todayEvents.length}):
+    ${todayEvents.map(e => `- ${e.title} at ${new Date(e.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`).join('\n') || "No meetings scheduled."}
+    
+    ✅ TASKS DUE/OVERDUE (${tasksDue.length}):
+    ${tasksDue.map(t => `- ${t.title} (${t.priority})`).join('\n') || "No urgent deadlines."}
+    
+    💰 ALERTS:
+    ${overdueInvoices.length > 0 ? `${overdueInvoices.length} invoices are overdue.` : "No overdue invoices."}
+    `;
+    
+    return context;
+}

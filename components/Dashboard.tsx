@@ -1,7 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { AppTool, SavedItem } from '../types';
 import { Icons } from '../constants';
 import { getSupabaseConfig, getSavedItems } from '../services/supabaseService';
+import { generateDailyBriefing } from '../services/geminiService';
+import { getDailyContext } from '../services/advisorService';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface DashboardProps {
   setTool: (tool: AppTool) => void;
@@ -36,6 +40,13 @@ const Widget = ({ title, desc, icon: Icon, onClick, color }: any) => (
 const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
   const [recentItems, setRecentItems] = useState<SavedItem[]>([]);
   const [dbConnected, setDbConnected] = useState(false);
+  
+  // Daily Briefing State
+  const [briefing, setBriefing] = useState<string | null>(null);
+  const [briefingLoading, setBriefingLoading] = useState(false);
+  
+  // Quick Note State
+  const [quickNote, setQuickNote] = useState('');
 
   useEffect(() => {
     const checkDb = async () => {
@@ -45,13 +56,104 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
         setDbConnected(!!config);
     };
     checkDb();
+    
+    // Load persisted briefing if from today
+    const savedBriefing = localStorage.getItem('byete_daily_briefing');
+    const savedBriefingDate = localStorage.getItem('byete_daily_briefing_date');
+    const today = new Date().toDateString();
+    
+    if (savedBriefing && savedBriefingDate === today) {
+        setBriefing(savedBriefing);
+    }
+    
+    // Load Quick Note
+    const savedNote = localStorage.getItem('byete_quick_note');
+    if (savedNote) setQuickNote(savedNote);
   }, []);
+
+  const handleGenerateBriefing = async () => {
+      setBriefingLoading(true);
+      try {
+          const context = await getDailyContext();
+          const result = await generateDailyBriefing(context);
+          setBriefing(result);
+          
+          localStorage.setItem('byete_daily_briefing', result);
+          localStorage.setItem('byete_daily_briefing_date', new Date().toDateString());
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setBriefingLoading(false);
+      }
+  };
+
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setQuickNote(e.target.value);
+      localStorage.setItem('byete_quick_note', e.target.value);
+  };
 
   return (
     <div className="max-w-7xl mx-auto w-full pb-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200 mb-2">Welcome Back</h1>
-        <p className="text-slate-500 dark:text-slate-400">Your AI-powered business command center is ready.</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200 mb-2">Welcome Back</h1>
+            <p className="text-slate-500 dark:text-slate-400">Your AI-powered business command center is ready.</p>
+        </div>
+        <div className="text-right hidden md:block">
+            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">{new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+      </div>
+
+      {/* Hero Section: Briefing & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Daily Briefing Card */}
+          <div className="lg:col-span-2 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg relative overflow-hidden flex flex-col">
+              <div className="absolute top-0 right-0 -mt-10 -mr-10 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl"></div>
+              
+              <div className="flex justify-between items-center mb-4 relative z-10">
+                  <h3 className="text-lg font-bold flex items-center gap-2"><Icons.Sparkles /> Morning Briefing</h3>
+                  {!briefing && !briefingLoading && (
+                      <button 
+                        onClick={handleGenerateBriefing}
+                        className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors backdrop-blur-sm"
+                      >
+                          Generate
+                      </button>
+                  )}
+              </div>
+              
+              <div className="flex-1 relative z-10">
+                  {briefingLoading ? (
+                      <div className="animate-pulse space-y-3 opacity-80">
+                          <div className="h-4 bg-white/30 rounded w-3/4"></div>
+                          <div className="h-4 bg-white/30 rounded w-1/2"></div>
+                          <div className="h-4 bg-white/30 rounded w-5/6"></div>
+                      </div>
+                  ) : briefing ? (
+                      <div className="prose prose-invert prose-sm max-w-none">
+                          <MarkdownRenderer content={briefing} className="text-white" />
+                      </div>
+                  ) : (
+                      <div className="flex flex-col items-center justify-center h-full opacity-80 py-4">
+                          <p className="text-sm italic mb-2">Get a concise AI summary of your tasks, meetings, and alerts for today.</p>
+                      </div>
+                  )}
+              </div>
+          </div>
+
+          {/* Quick Note Scratchpad */}
+          <div className="bg-amber-50 dark:bg-slate-800 rounded-xl p-4 border border-amber-100 dark:border-slate-700 shadow-sm flex flex-col relative group">
+              <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="text-amber-300 dark:text-slate-600"><Icons.Pen /></div>
+              </div>
+              <label className="text-xs font-bold text-amber-800 dark:text-slate-400 uppercase tracking-wide mb-2 block">Quick Note</label>
+              <textarea 
+                  value={quickNote}
+                  onChange={handleNoteChange}
+                  placeholder="Jot down a thought..."
+                  className="flex-1 w-full bg-transparent resize-none outline-none text-sm text-slate-800 dark:text-slate-200 placeholder:text-amber-800/30 dark:placeholder:text-slate-600"
+              />
+          </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">

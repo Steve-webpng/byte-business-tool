@@ -558,6 +558,35 @@ export const generateMeetingBriefing = async (contact: Contact, context?: string
     return response.text || "Briefing generation failed.";
 };
 
+// --- Daily Briefing ---
+export const generateDailyBriefing = async (context: string): Promise<string> => {
+    const ai = getAIClient();
+    const prompt = `
+      ${context}
+      
+      INSTRUCTION:
+      You are an executive assistant. It is early morning.
+      Review the schedule and tasks for today.
+      Write a concise, 3-bullet executive summary of what I need to focus on today.
+      Tone: Inspiring, professional, efficient.
+      
+      Format:
+      **🌤️ Morning Briefing**
+      - Bullet 1
+      - Bullet 2
+      - Bullet 3
+      
+      Quote: "A short motivational quote."
+    `;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt
+    });
+    
+    return response.text || "Have a great day!";
+};
+
 // --- Market Research with Grounding ---
 export const performMarketResearch = async (query: string, context?: string, mode: 'general' | 'competitor' | 'persona' | 'trends' = 'general') => {
   const ai = getAIClient();

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { performMarketResearch } from '../services/geminiService';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
@@ -17,6 +16,7 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
   const [analysisMode, setAnalysisMode] = useState<'general' | 'competitor' | 'persona' | 'trends'>('general');
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('Global');
+  const [industry, setIndustry] = useState('');
   const [result, setResult] = useState<{ text: string; sources: GroundingChunk[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -31,8 +31,17 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
     try {
       const profile = getProfile();
       let context = formatProfileForPrompt(profile);
+      
+      let queryContext = [];
       if (region !== 'Global') {
-          context += `\nFOCUS REGION: ${region}. Prioritize data and sources relevant to this region.`;
+          queryContext.push(`Region: ${region}`);
+      }
+      if (industry.trim()) {
+          queryContext.push(`Industry: ${industry.trim()}`);
+      }
+
+      if (queryContext.length > 0) {
+          context += `\n\nQUERY FOCUS - Prioritize data and sources for the following:\n${queryContext.join('\n')}`;
       }
 
       const data = await performMarketResearch(query, context, analysisMode);
@@ -103,7 +112,14 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
                         </div>
                         
                         {!isWidget && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={industry}
+                                    onChange={(e) => setIndustry(e.target.value)}
+                                    placeholder="Industry Focus (optional)"
+                                    className="py-4 px-6 rounded-full border border-slate-300 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
+                                />
                                 <select 
                                     value={region} 
                                     onChange={(e) => setRegion(e.target.value)}

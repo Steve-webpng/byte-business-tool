@@ -98,6 +98,8 @@ export interface Task {
   description?: string;
   priority: 'High' | 'Medium' | 'Low';
   columnId: 'todo' | 'doing' | 'done';
+  dueDate?: string; // ISO Date String
+  project?: string; // Project Name / Category
 }
 
 export interface BoardColumn {

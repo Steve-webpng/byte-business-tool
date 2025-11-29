@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { generateSpeech, decodeAudio, pcmToWav } from '../services/geminiService';
 import { Icons } from '../constants';
@@ -78,13 +77,10 @@ const BookToAudio: React.FC = () => {
         setProgress(0);
 
         try {
-            // Smart Chunking strategy
-            // The model works best with < 4096 tokens, safe bet is ~4000-5000 characters per chunk
             const MAX_CHUNK_SIZE = 4000;
-            const chunks = [];
+            const chunks: string[] = [];
             let currentChunk = '';
             
-            // Split by sentence boundaries to avoid cutting mid-sentence
             const sentences = extractedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1|").split("|");
             
             for (const sentence of sentences) {
@@ -97,7 +93,6 @@ const BookToAudio: React.FC = () => {
             }
             if (currentChunk) chunks.push(currentChunk);
 
-            // Generate Audio for each chunk
             const audioParts: Uint8Array[] = [];
             
             for (let i = 0; i < chunks.length; i++) {
@@ -105,16 +100,14 @@ const BookToAudio: React.FC = () => {
                 const chunkText = chunks[i].trim();
                 if (!chunkText) continue;
 
-                // Call Gemini TTS
                 const base64 = await generateSpeech(chunkText, selectedVoice);
-                const pcmData = decodeAudio(base64); // Decode to raw Uint8Array (PCM 16-bit LE)
+                const pcmData = decodeAudio(base64);
                 audioParts.push(pcmData);
                 
                 setProgress(Math.round(((i + 1) / chunks.length) * 100));
             }
 
             setProcessingStep('Stitching audio...');
-            // Concatenate all PCM parts
             const totalLength = audioParts.reduce((acc, part) => acc + part.length, 0);
             const mergedPcm = new Uint8Array(totalLength);
             let offset = 0;
@@ -123,7 +116,6 @@ const BookToAudio: React.FC = () => {
                 offset += part.length;
             }
 
-            // Convert complete PCM to WAV
             const wavBlob = pcmToWav(mergedPcm);
             const url = URL.createObjectURL(wavBlob);
             setAudioUrl(url);
@@ -161,7 +153,6 @@ const BookToAudio: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-                {/* Left Panel: Upload & Config */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <div 
                         onDrop={handleDrop}
@@ -215,11 +206,9 @@ const BookToAudio: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Right Panel: Preview & Result */}
                 <div className="lg:col-span-2 flex flex-col gap-6 h-full min-h-[500px]">
-                    {/* Status / Loading Overlay */}
                     {loading && (
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-blue-200 dark:border-blue-900 shadow-sm animate-pulse">
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-blue-200 dark:border-blue-900 shadow-sm">
                             <h3 className="font-bold text-blue-600 dark:text-blue-400 mb-2">{processingStep}</h3>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                                 <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
@@ -227,7 +216,6 @@ const BookToAudio: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Result Player */}
                     {audioUrl && (
                         <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-6 rounded-xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
                             <div className="flex items-center gap-3">
@@ -250,7 +238,6 @@ const BookToAudio: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Text Preview */}
                     <div className="flex-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden">
                         <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                             <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase">Extracted Content Preview</h3>

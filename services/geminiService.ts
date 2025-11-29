@@ -830,6 +830,43 @@ export const generateSpeech = async (text: string, voice: string = 'Kore'): Prom
   return audioData;
 };
 
+// Convert Raw PCM (Int16) to WAV Blob for downloading
+export const pcmToWav = (pcmData: Uint8Array, sampleRate: number = 24000, numChannels: number = 1): Blob => {
+    const buffer = new ArrayBuffer(44 + pcmData.length);
+    const view = new DataView(buffer);
+
+    // RIFF chunk descriptor
+    const writeString = (view: DataView, offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + pcmData.length, true);
+    writeString(view, 8, 'WAVE');
+
+    // fmt sub-chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+    view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * 2, true); // ByteRate
+    view.setUint16(32, numChannels * 2, true); // BlockAlign
+    view.setUint16(34, 16, true); // BitsPerSample
+
+    // data sub-chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, pcmData.length, true);
+
+    // PCM Data
+    const dataView = new Uint8Array(buffer, 44);
+    dataView.set(pcmData);
+
+    return new Blob([buffer], { type: 'audio/wav' });
+};
+
 export const analyzeSessionTranscript = async (transcript: TranscriptItem[]): Promise<string> => {
   const ai = getAIClient();
   const conversation = transcript.map(t => `${t.role.toUpperCase()}: ${t.text}`).join('\n');

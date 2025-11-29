@@ -53,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
         { id: AppTool.CONTENT, label: 'Content Studio', icon: Icons.Pen },
         { id: AppTool.VOICE_NOTES, label: 'Voice Notes', icon: Icons.ClipboardText },
         { id: AppTool.AUDIO_STUDIO, label: 'Audio Studio', icon: Icons.SpeakerWave },
+        { id: AppTool.BOOK_TO_AUDIO, label: 'Book to Audio', icon: Icons.Headphones },
       ]
     },
     {

@@ -20,6 +20,7 @@ import CRM from './components/CRM';
 import VoiceNotes from './components/VoiceNotes';
 import AudioStudio from './components/AudioStudio';
 import BookToAudio from './components/BookToAudio';
+import VideoCreator from './components/VideoCreator';
 import CalendarView from './components/CalendarView';
 import ExpenseTracker from './components/ExpenseTracker';
 import InvoiceBuilder from './components/InvoiceBuilder';
@@ -141,6 +142,8 @@ const AppContent: React.FC = () => {
         return <AudioStudio />;
       case AppTool.BOOK_TO_AUDIO:
         return <BookToAudio />;
+      case AppTool.VIDEO_STUDIO:
+        return <VideoCreator />;
       case AppTool.ACADEMY:
         return <BusinessAcademy />;
       case AppTool.FOCUS:

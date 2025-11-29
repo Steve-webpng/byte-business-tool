@@ -10,6 +10,7 @@ export enum AppTool {
   VOICE_NOTES = 'VOICE_NOTES',
   AUDIO_STUDIO = 'AUDIO_STUDIO',
   BOOK_TO_AUDIO = 'BOOK_TO_AUDIO',
+  VIDEO_STUDIO = 'VIDEO_STUDIO',
   CRM = 'CRM',
   CALENDAR = 'CALENDAR',
   EXPENSE_TRACKER = 'EXPENSE_TRACKER',
@@ -241,4 +242,13 @@ export interface Lesson {
         options: string[];
         correctAnswer: number;
     };
+}
+
+// Video Creator
+export interface VideoScene {
+  startTime: number;
+  endTime: number;
+  text: string;
+  visualPrompt: string;
+  image?: string; // base64
 }

@@ -1,4 +1,5 @@
 
+
 import { Type } from "@google/genai";
 
 export enum AppTool {
@@ -250,5 +251,8 @@ export interface VideoScene {
   endTime: number;
   text: string;
   visualPrompt: string;
+  editablePrompt: string;
   image?: string; // base64
+  regenerating?: boolean;
+  words?: { word: string; startTime: number; endTime: number }[];
 }

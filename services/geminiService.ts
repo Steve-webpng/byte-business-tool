@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
 import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene } from "../types";
@@ -330,13 +331,14 @@ export const transcribeAndAnalyzeAudioForVideo = async (base64Audio: string, use
     
     const audioPart = { inlineData: { mimeType, data: audioData } };
     let promptText = `
-        Transcribe the audio.
-        Break the transcription down into visual scenes based on the content flow.
+        Analyze the audio. Provide a full transcription with word-level timestamps.
+        Then, break the transcription down into logical visual scenes based on the content flow.
         For each scene, provide:
         1. "startTime" (in seconds, e.g. 0.0)
         2. "endTime" (in seconds)
-        3. "text" (the spoken text segment)
+        3. "text" (the spoken text segment for the scene)
         4. "visualPrompt" (A detailed, descriptive prompt to generate a 16:9 image for this scene. It should describe the setting, objects, and mood. No text overlays.)
+        5. "words" (An array of objects with "word", "startTime", and "endTime" for the scene's text)
         
         Return a JSON array of scene objects.
     `;
@@ -344,7 +346,7 @@ export const transcribeAndAnalyzeAudioForVideo = async (base64Audio: string, use
     if (useWebGrounding) {
         promptText += `
         IMPORTANT: Use Google Search to find accurate visual details for any specific real-world entities, locations, or historical events mentioned. 
-        Incorporate these factual visual details into the "visualPrompt".
+        Incorporate these factual visual details into the "visualPrompt". Be specific.
         `;
     }
 
@@ -358,23 +360,31 @@ export const transcribeAndAnalyzeAudioForVideo = async (base64Audio: string, use
                     startTime: { type: Type.NUMBER },
                     endTime: { type: Type.NUMBER },
                     text: { type: Type.STRING },
-                    visualPrompt: { type: Type.STRING }
+                    visualPrompt: { type: Type.STRING },
+                    words: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                word: { type: Type.STRING },
+                                startTime: { type: Type.NUMBER },
+                                endTime: { type: Type.NUMBER }
+                            },
+                            required: ["word", "startTime", "endTime"]
+                        }
+                    }
                 },
-                required: ["startTime", "endTime", "text", "visualPrompt"]
+                required: ["startTime", "endTime", "text", "visualPrompt", "words"]
             }
         }
     };
 
     if (useWebGrounding) {
         config.tools = [{ googleSearch: {} }];
-        // Note: responseSchema is technically not supported with tools in some versions, but 2.5 flash often handles it.
-        // If strict schema fails with tools, we might need to parse raw text.
-        // For reliability with tools, we'll try without strict schema if grounding is on, or use Pro model.
-        // Let's use Pro model for grounding + structured output capability.
     }
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-pro-preview', // Pro model is better for complex JSON and tool use
         contents: { parts: [audioPart, { text: promptText }] },
         config: config
     });
@@ -382,7 +392,9 @@ export const transcribeAndAnalyzeAudioForVideo = async (base64Audio: string, use
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response generated");
     
-    return JSON.parse(jsonText);
+    // Add editablePrompt to each scene for the UI
+    const scenes = JSON.parse(jsonText) as VideoScene[];
+    return scenes.map(scene => ({ ...scene, editablePrompt: scene.visualPrompt }));
 };
 
 export const generateSpeech = async (text: string, voice: string = 'Kore'): Promise<string> => {

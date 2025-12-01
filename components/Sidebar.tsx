@@ -1,8 +1,9 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { AppTool } from '../types';
 import { Icons } from '../constants';
-import { getApiKey, getModelPreference } from '../services/settingsService';
+import { getApiKey, getModelPreference, getWorkspaces, getActiveWorkspaceId, setActiveWorkspaceId, createWorkspace } from '../services/settingsService';
 
 interface SidebarProps {
   currentTool: AppTool;
@@ -15,6 +16,9 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, setIsMobileOpen, onOpenSearch }) => {
   const [hasKey, setHasKey] = useState(false);
   const [modelName, setModelName] = useState('Gemini');
+  const [workspaces, setWorkspaces] = useState(getWorkspaces());
+  const [activeWorkspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
+  const [showWsMenu, setShowWsMenu] = useState(false);
 
   useEffect(() => {
     const userKey = getApiKey();
@@ -26,6 +30,21 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
     else if (model.includes('pro')) setModelName('Gemini Pro');
     else setModelName('Gemini AI');
   }, [currentTool]);
+
+  const handleWorkspaceChange = (id: string) => {
+      setActiveWorkspaceId(id);
+      setWorkspaceId(id);
+      setShowWsMenu(false);
+  };
+
+  const handleCreateWorkspace = () => {
+      const name = prompt("Enter new workspace name:");
+      if(name) {
+          const newWs = createWorkspace(name);
+          setWorkspaces(getWorkspaces());
+          handleWorkspaceChange(newWs.id);
+      }
+  };
 
   const navGroups = [
     {
@@ -43,6 +62,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
         { id: AppTool.CRM, label: 'Contacts (CRM)', icon: Icons.Identification },
         { id: AppTool.INVOICES, label: 'Invoices', icon: Icons.DocumentCurrency },
         { id: AppTool.EXPENSE_TRACKER, label: 'Expense Tracker', icon: Icons.Receipt },
+        { id: AppTool.HIRING, label: 'Hiring ATS', icon: Icons.UserPlus },
+        { id: AppTool.FINANCIALS, label: 'Financials', icon: Icons.Money },
+        { id: AppTool.AUTOMATOR, label: 'Automations', icon: Icons.Flow },
         { id: AppTool.ADVISOR, label: 'Chief of Staff', icon: Icons.ChatBubble },
       ]
     },
@@ -62,6 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
       items: [
         { id: AppTool.RESEARCH, label: 'Market Research', icon: Icons.Search },
         { id: AppTool.ANALYSIS, label: 'Data Analysis', icon: Icons.Chart },
+        { id: AppTool.PROSPECTOR, label: 'Lead Prospector', icon: Icons.Telescope },
         { id: AppTool.ACADEMY, label: 'Business Academy', icon: Icons.AcademicCap },
         { id: AppTool.FILE_CHAT, label: 'File Chat', icon: Icons.Upload },
         { id: AppTool.COACH, label: 'Sales Coach', icon: Icons.Mic },
@@ -70,6 +93,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
       ]
     }
   ];
+
+  const activeWsName = workspaces.find(w => w.id === activeWorkspaceId)?.name || 'Workspace';
 
   const handleNavClick = (toolId: AppTool) => {
     setTool(toolId);
@@ -92,37 +117,53 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTool, setTool, isMobileOpen, s
         fixed top-0 left-0 h-screen w-72 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        {/* Header */}
-        <div className="p-6 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg text-white transform transition-transform hover:scale-105">
-                <span className="font-bold text-lg">B</span>
-            </div>
-            <div className="flex flex-col justify-center">
-                <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight leading-none">Byete</h1>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mt-0.5 opacity-90">Business OS</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-                onClick={onOpenSearch}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 hidden md:block"
-                title="Command Palette (Ctrl+K)"
-            >
-                <Icons.Search />
-            </button>
+        {/* Workspace Switcher */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800/50 shrink-0 relative">
             <button 
-                onClick={() => setIsMobileOpen(false)} 
-                className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                aria-label="Close sidebar"
+                onClick={() => setShowWsMenu(!showWsMenu)}
+                className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
             >
-                <Icons.X />
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg text-white text-sm font-bold">
+                        {activeWsName.charAt(0)}
+                    </div>
+                    <div className="flex flex-col items-start">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{activeWsName}</span>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider">Free Plan</span>
+                    </div>
+                </div>
+                <div className="text-slate-400 group-hover:text-slate-600">
+                    <Icons.SwitchHorizontal />
+                </div>
             </button>
-          </div>
+
+            {/* Dropdown */}
+            {showWsMenu && (
+                <div className="absolute top-full left-4 right-4 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden py-1">
+                    {workspaces.map(ws => (
+                        <button
+                            key={ws.id}
+                            onClick={() => handleWorkspaceChange(ws.id)}
+                            className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex justify-between items-center"
+                        >
+                            {ws.name}
+                            {ws.id === activeWorkspaceId && <span className="text-blue-500 text-xs font-bold">ACTIVE</span>}
+                        </button>
+                    ))}
+                    <div className="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1">
+                        <button 
+                            onClick={handleCreateWorkspace}
+                            className="w-full text-left px-4 py-3 text-sm text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2"
+                        >
+                            <Icons.Plus /> Create Workspace
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
         
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-8 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 custom-scrollbar">
           {navGroups.map((group, idx) => (
             <div key={idx}>
               <h3 className="px-4 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 select-none">

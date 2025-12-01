@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -26,10 +27,15 @@ import ExpenseTracker from './components/ExpenseTracker';
 import InvoiceBuilder from './components/InvoiceBuilder';
 import BusinessAcademy from './components/BusinessAcademy';
 import CommandPalette from './components/CommandPalette';
+import Automator from './components/Automator';
+import Prospector from './components/Prospector';
+import HiringManager from './components/HiringManager';
+import Financials from './components/Financials';
 import { AppTool, ToolDefinition, Task } from './types';
 import { Icons } from './constants';
 import { ToastProvider, useToast } from './components/ToastContainer';
-import { getTheme, Theme } from './services/settingsService';
+import { getTheme, Theme, getActiveWorkspaceId } from './services/settingsService';
+import { getTasks, saveTask } from './services/supabaseService';
 
 const AppContent: React.FC = () => {
   const [currentTool, setCurrentTool] = useState<AppTool>(AppTool.MISSION_CONTROL);
@@ -38,10 +44,29 @@ const AppContent: React.FC = () => {
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [workflowData, setWorkflowData] = useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
   
-  // Lifted state for Tasks to allow access from other components
+  // Tasks managed centrally but fetched from service
   const [tasks, setTasks] = useState<Task[]>([]);
   const toast = useToast();
+
+  const refreshTasks = async () => {
+      const t = await getTasks();
+      setTasks(t);
+  };
+
+  useEffect(() => {
+      refreshTasks();
+      
+      const handleWorkspaceChange = () => {
+          setWorkspaceId(getActiveWorkspaceId());
+          refreshTasks();
+          toast.show("Workspace changed", "info");
+      };
+      
+      window.addEventListener('workspaceChanged', handleWorkspaceChange);
+      return () => window.removeEventListener('workspaceChanged', handleWorkspaceChange);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -95,14 +120,16 @@ const AppContent: React.FC = () => {
     setWorkflowData(null);
   };
 
-  const handleAddTask = (title: string) => {
+  const handleAddTask = async (title: string) => {
       const newTask: Task = { 
           id: `task-${Date.now()}`, 
           title, 
           priority: 'Medium', 
-          columnId: 'todo' 
+          columnId: 'todo',
+          workspace_id: workspaceId
       };
-      setTasks(prev => [...prev, newTask]);
+      await saveTask(newTask);
+      await refreshTasks();
       toast.show("Task added to Projects!", "success");
   };
 
@@ -114,60 +141,70 @@ const AppContent: React.FC = () => {
       }
   };
 
+  // Force re-render of tools when workspace changes by using key
   const renderContent = () => {
+    const key = workspaceId;
     switch (currentTool) {
       case AppTool.MISSION_CONTROL:
-        return <MissionControl />;
+        return <MissionControl key={key} />;
       case AppTool.DASHBOARD:
-        return <Dashboard setTool={setCurrentTool} />;
+        return <Dashboard key={key} setTool={setCurrentTool} />;
       case AppTool.ADVISOR:
-        return <BusinessAdvisor onWorkflowSend={handleWorkflowSend} onAddTask={handleAddTask} />;
+        return <BusinessAdvisor key={key} onWorkflowSend={handleWorkflowSend} onAddTask={handleAddTask} />;
       case AppTool.PROJECTS:
-        return <TaskManager tasks={tasks} setTasks={setTasks} />;
+        return <TaskManager key={key} tasks={tasks} setTasks={setTasks} refreshTasks={refreshTasks} />;
       case AppTool.CRM:
-        return <CRM />;
+        return <CRM key={key} />;
       case AppTool.CALENDAR:
-        return <CalendarView />;
+        return <CalendarView key={key} />;
       case AppTool.EXPENSE_TRACKER:
-        return <ExpenseTracker />;
+        return <ExpenseTracker key={key} />;
       case AppTool.INVOICES:
-        return <InvoiceBuilder />;
+        return <InvoiceBuilder key={key} />;
+      case AppTool.HIRING:
+        return <HiringManager key={key} />;
+      case AppTool.FINANCIALS:
+        return <Financials key={key} />;
       case AppTool.DOCUMENTS:
-        return <SmartEditor workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
+        return <SmartEditor key={key} workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.FILE_CHAT:
-        return <FileChat />;
+        return <FileChat key={key} />;
       case AppTool.VOICE_NOTES:
-        return <VoiceNotes onAddTask={handleAddTask} />;
+        return <VoiceNotes key={key} onAddTask={handleAddTask} />;
       case AppTool.AUDIO_STUDIO:
-        return <AudioStudio />;
+        return <AudioStudio key={key} />;
       case AppTool.BOOK_TO_AUDIO:
-        return <BookToAudio />;
+        return <BookToAudio key={key} />;
       case AppTool.VIDEO_STUDIO:
-        return <VideoCreator />;
+        return <VideoCreator key={key} />;
       case AppTool.ACADEMY:
-        return <BusinessAcademy />;
+        return <BusinessAcademy key={key} />;
       case AppTool.FOCUS:
         return <FocusTimer />;
+      case AppTool.AUTOMATOR:
+        return <Automator key={key} />;
+      case AppTool.PROSPECTOR:
+        return <Prospector key={key} />;
       case AppTool.LIBRARY:
         return <ToolLibrary onSelectTool={handleSelectTool} />;
       case AppTool.UNIVERSAL_TOOL:
         return selectedToolDef 
-          ? <UniversalTool tool={selectedToolDef} onBack={() => setCurrentTool(AppTool.LIBRARY)} />
+          ? <UniversalTool key={key} tool={selectedToolDef} onBack={() => setCurrentTool(AppTool.LIBRARY)} />
           : <ToolLibrary onSelectTool={handleSelectTool} />;
       case AppTool.CONTENT:
-        return <ContentGenerator onWorkflowSend={handleWorkflowSend} workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
+        return <ContentGenerator key={key} onWorkflowSend={handleWorkflowSend} workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.RESEARCH:
-        return <MarketResearch onWorkflowSend={handleWorkflowSend} />;
+        return <MarketResearch key={key} onWorkflowSend={handleWorkflowSend} />;
       case AppTool.ANALYSIS:
-        return <DataAnalyzer />;
+        return <DataAnalyzer key={key} />;
       case AppTool.COACH:
-        return <LiveSupport />;
+        return <LiveSupport key={key} />;
       case AppTool.DATABASE:
-        return <DatabaseView />;
+        return <DatabaseView key={key} />;
       case AppTool.SETTINGS:
         return <SettingsView onThemeChange={setTheme} />;
       default:
-        return <Dashboard setTool={setCurrentTool} />;
+        return <Dashboard key={key} setTool={setCurrentTool} />;
     }
   };
 

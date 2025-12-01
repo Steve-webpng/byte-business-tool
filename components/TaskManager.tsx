@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Task } from '../types';
 import { generateProjectTasks, prioritizeTasks, generateSubtasks } from '../services/geminiService';
-import { getProfile, formatProfileForPrompt } from '../services/settingsService';
-import { saveItem } from '../services/supabaseService';
+import { getProfile, formatProfileForPrompt, getUsers } from '../services/settingsService';
+import { saveTask, deleteTask as deleteServiceTask } from '../services/supabaseService';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
 import { format, isPast, isToday, parseISO, differenceInDays } from 'date-fns';
@@ -11,9 +12,10 @@ import { format, isPast, isToday, parseISO, differenceInDays } from 'date-fns';
 interface TaskManagerProps {
     tasks: Task[];
     setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+    refreshTasks: () => void;
 }
 
-const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
+const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks }) => {
   const [input, setInput] = useState('');
   const [newPriority, setNewPriority] = useState<Task['priority']>('Medium');
   const [newDate, setNewDate] = useState('');
@@ -26,12 +28,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
   const [loading, setLoading] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const toast = useToast();
-
-  useEffect(() => {
-      if (tasks.length > 0) {
-        localStorage.setItem('byete_current_board_state', JSON.stringify(tasks));
-      }
-  }, [tasks]);
+  const users = getUsers();
 
   // Get unique projects
   const uniqueProjects = useMemo(() => {
@@ -48,17 +45,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
       });
   }, [tasks, filterProject, filterPriority]);
 
-  const handleManualSave = async () => {
-      const content = JSON.stringify(tasks);
-      const res = await saveItem('ProjectBoard', `Project Board Snapshot - ${new Date().toLocaleTimeString()}`, content);
-      if (res.success) {
-          toast.show("Board saved to database history!", "success");
-      } else {
-          toast.show("Failed to save board.", "error");
-      }
-  };
-
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
       if (!input.trim()) return;
       const newTask: Task = {
           id: `task-${Date.now()}`,
@@ -68,9 +55,9 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
           columnId: 'todo',
           project: newProject.trim() || undefined
       };
-      setTasks(prev => [...prev, newTask]);
+      await saveTask(newTask);
+      await refreshTasks();
       setInput('');
-      // Keep other settings for rapid entry, maybe clear date?
       toast.show("Task added successfully", "success");
   };
 
@@ -82,13 +69,15 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
         const context = formatProfileForPrompt(profile);
         const newTasks = await generateProjectTasks(input, context);
         
-        // Apply current project context to generated tasks
-        const tasksWithProject = newTasks.map(t => ({
-            ...t,
-            project: newProject.trim() || undefined
-        }));
+        // Save generated tasks
+        for (const t of newTasks) {
+            await saveTask({
+                ...t,
+                project: newProject.trim() || undefined
+            });
+        }
 
-        setTasks(prev => [...prev, ...tasksWithProject]);
+        await refreshTasks();
         setInput('');
         toast.show("AI tasks generated!", "success");
     } catch (e) {
@@ -106,7 +95,11 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
           const profile = getProfile();
           const context = formatProfileForPrompt(profile);
           const updatedTasks = await prioritizeTasks(tasks, context);
-          setTasks(updatedTasks);
+          
+          for (const t of updatedTasks) {
+              await saveTask(t);
+          }
+          await refreshTasks();
           toast.show("Tasks have been re-prioritized by AI.", "info");
       } catch (e) {
           console.error(e);
@@ -126,38 +119,47 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
           const checklist = subtasks.map(st => `- [ ] ${st}`).join('\n');
           const updatedDescription = (task.description ? task.description + '\n\n' : '') + "**Subtasks:**\n" + checklist;
           
-          setTasks(prev => prev.map(t => t.id === task.id ? { ...t, description: updatedDescription } : t));
+          await saveTask({ ...task, description: updatedDescription });
+          await refreshTasks();
           toast.show("Subtasks added to description!", "success");
       } catch (e) {
           toast.show("Failed to breakdown task.", "error");
       }
   };
 
-  const handleUpdateTask = (e: React.FormEvent) => {
+  const handleUpdateTask = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editTask) return;
-      setTasks(prev => prev.map(t => t.id === editTask.id ? editTask : t));
+      await saveTask(editTask);
+      await refreshTasks();
       setEditTask(null);
       toast.show("Task updated", "success");
   };
 
-  const moveTask = (taskId: string, direction: 'forward' | 'backward') => {
-      setTasks(prev => prev.map(t => {
-          if (t.id !== taskId) return t;
-          let newCol = t.columnId;
-          if (direction === 'forward') {
-              if (t.columnId === 'todo') newCol = 'doing';
-              else if (t.columnId === 'doing') newCol = 'done';
-          } else {
-              if (t.columnId === 'done') newCol = 'doing';
-              else if (t.columnId === 'doing') newCol = 'todo';
-          }
-          return { ...t, columnId: newCol };
-      }));
+  const moveTask = async (task: Task, direction: 'forward' | 'backward') => {
+      let newCol = task.columnId;
+      if (direction === 'forward') {
+          if (task.columnId === 'todo') newCol = 'doing';
+          else if (task.columnId === 'doing') newCol = 'done';
+      } else {
+          if (task.columnId === 'done') newCol = 'doing';
+          else if (task.columnId === 'doing') newCol = 'todo';
+      }
+      const updated = { ...task, columnId: newCol };
+      
+      // Optimistic update
+      setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+      
+      await saveTask(updated);
+      await refreshTasks();
   };
 
-  const deleteTask = (taskId: string) => {
+  const deleteTask = async (taskId: string) => {
+      // Optimistic delete
       setTasks(prev => prev.filter(t => t.id !== taskId));
+      
+      await deleteServiceTask(taskId);
+      await refreshTasks();
   };
 
   const getPriorityColor = (p: string) => {
@@ -180,6 +182,8 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
       return 'text-slate-400';
   };
 
+  const getAssignee = (id?: string) => users.find(u => u.id === id);
+
   const renderColumn = (colId: 'todo' | 'doing' | 'done', title: string, headerColor: string) => {
       const colTasks = filteredTasks.filter(t => t.columnId === colId);
       
@@ -193,7 +197,9 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                   <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full text-xs font-mono">{colTasks.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {colTasks.map(task => (
+                  {colTasks.map(task => {
+                      const assignee = getAssignee(task.assignee_id);
+                      return (
                       <div 
                         key={task.id} 
                         onClick={() => setEditTask(task)}
@@ -222,22 +228,33 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                           )}
                           
                           <div className="flex justify-between items-center pt-2 border-t border-slate-50 dark:border-slate-700/50">
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={(e) => { e.stopPropagation(); handleExpandTask(task); }} className="text-slate-300 hover:text-purple-500 p-1" title="AI Split Task">
-                                      <Icons.Sparkles />
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="text-slate-300 hover:text-red-500 p-1" title="Delete">
-                                      <Icons.Trash />
-                                  </button>
+                              <div className="flex items-center gap-2">
+                                  {assignee ? (
+                                      <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold border border-white dark:border-slate-700 shadow-sm" title={assignee.name}>
+                                          {assignee.avatar || assignee.name.charAt(0)}
+                                      </div>
+                                  ) : (
+                                      <div className="w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 border-dashed flex items-center justify-center text-slate-300">
+                                          <Icons.User />
+                                      </div>
+                                  )}
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                                      <button onClick={(e) => { e.stopPropagation(); handleExpandTask(task); }} className="text-slate-300 hover:text-purple-500 p-1" title="AI Split Task">
+                                          <Icons.Sparkles />
+                                      </button>
+                                      <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="text-slate-300 hover:text-red-500 p-1" title="Delete">
+                                          <Icons.Trash />
+                                      </button>
+                                  </div>
                               </div>
                               <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                                 {colId !== 'todo' && (
-                                    <button onClick={() => moveTask(task.id, 'backward')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-slate-600 transition-colors">
+                                    <button onClick={() => moveTask(task, 'backward')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-slate-600 transition-colors">
                                         <div className="rotate-180"><Icons.ArrowRight /></div>
                                     </button>
                                 )}
                                 {colId !== 'done' ? (
-                                    <button onClick={() => moveTask(task.id, 'forward')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-slate-600 transition-colors">
+                                    <button onClick={() => moveTask(task, 'forward')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-slate-600 transition-colors">
                                         <Icons.ArrowRight />
                                     </button>
                                 ) : (
@@ -246,7 +263,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                               </div>
                           </div>
                       </div>
-                  ))}
+                  )})}
                   {colTasks.length === 0 && (
                       <div className="text-center py-10 text-slate-400 text-xs italic border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl m-2 bg-slate-50/50 dark:bg-slate-800/20">
                           No tasks in this view
@@ -265,7 +282,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                 <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                    <Icons.Board /> Project Management
                 </h2>
-                <p className="text-slate-500 dark:text-slate-400">Manage tasks, deadlines, and track project progress.</p>
+                <p className="text-slate-500 dark:text-slate-400">Manage tasks, deadlines, and team assignments.</p>
             </div>
             <div className="flex gap-2">
                  <button 
@@ -274,12 +291,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                     className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
                 >
                     <Icons.Scale /> AI Prioritize
-                </button>
-                <button 
-                    onClick={handleManualSave} 
-                    className="flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/50 hover:bg-emerald-100 px-4 py-2 rounded-lg transition-colors border border-emerald-200"
-                >
-                    <Icons.Save /> Save Board
                 </button>
             </div>
         </div>
@@ -428,6 +439,19 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks }) => {
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
                                 />
                             </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Assignee</label>
+                            <select 
+                                value={editTask.assignee_id || ''}
+                                onChange={(e) => setEditTask({...editTask, assignee_id: e.target.value || undefined})}
+                                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
+                            >
+                                <option value="">Unassigned</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Description</label>

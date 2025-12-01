@@ -16,6 +16,7 @@ export enum AppTool {
   CALENDAR = 'CALENDAR',
   EXPENSE_TRACKER = 'EXPENSE_TRACKER',
   INVOICES = 'INVOICES',
+  HIRING = 'HIRING',
   ACADEMY = 'ACADEMY',
   CONTENT = 'CONTENT',
   RESEARCH = 'RESEARCH',
@@ -26,7 +27,35 @@ export enum AppTool {
   DATABASE = 'DATABASE',
   SETTINGS = 'SETTINGS',
   ADVISOR = 'ADVISOR',
-  FOCUS = 'FOCUS'
+  FOCUS = 'FOCUS',
+  AUTOMATOR = 'AUTOMATOR',
+  PROSPECTOR = 'PROSPECTOR',
+  FINANCIALS = 'FINANCIALS'
+}
+
+// Workspace & Collaboration
+export interface Workspace {
+  id: string;
+  name: string;
+  role: 'owner' | 'member';
+}
+
+export interface User {
+  id: string;
+  name: string;
+  avatar?: string; // URL or Initials
+  email: string;
+}
+
+export interface Comment {
+  id: string;
+  workspace_id: string;
+  related_to: 'contact' | 'deal' | 'doc' | 'task';
+  related_id: string | number;
+  user_id: string; // ID of User
+  content: string;
+  created_at: string;
+  user?: User; // Hydrated
 }
 
 export interface ToolDefinition {
@@ -54,7 +83,7 @@ export interface ManualToolConfig {
 export interface ChartDataPoint {
   name: string;
   value: number;
-  [key: string]: any; // Allow extra keys for multi-line charts or forecasts
+  [key: string]: any; 
 }
 
 export interface AnalysisResult {
@@ -84,6 +113,7 @@ export interface ChatMessage {
 export interface SavedItem {
   id: number;
   created_at: string;
+  workspace_id: string;
   tool_type: string;
   title: string;
   content: string;
@@ -97,12 +127,14 @@ export interface SupabaseConfig {
 // Kanban Types
 export interface Task {
   id: string;
+  workspace_id?: string;
   title: string;
   description?: string;
   priority: 'High' | 'Medium' | 'Low';
   columnId: 'todo' | 'doing' | 'done';
   dueDate?: string; // ISO Date String
   project?: string; // Project Name / Category
+  assignee_id?: string; // ID of User
 }
 
 export interface BoardColumn {
@@ -145,6 +177,7 @@ export interface TranscribedNote {
 export type ContactStatus = 'Lead' | 'Contacted' | 'Customer' | 'Archived';
 export interface Contact {
   id?: number;
+  workspace_id?: string;
   created_at?: string;
   name: string;
   email: string;
@@ -161,6 +194,7 @@ export type DealStage = 'Lead In' | 'Contact Made' | 'Proposal Sent' | 'Negotiat
 
 export interface Deal {
     id?: number;
+    workspace_id?: string;
     created_at?: string;
     name: string;
     value: number;
@@ -172,6 +206,7 @@ export interface Deal {
 // Calendar
 export interface CalendarEvent {
   id: string;
+  workspace_id?: string;
   title: string;
   start: string; // ISO String
   end: string; // ISO String
@@ -183,6 +218,7 @@ export interface CalendarEvent {
 // Expense Tracker
 export interface Expense {
     id?: number;
+    workspace_id?: string;
     created_at?: string;
     date: string; // ISO String date only
     category: string;
@@ -200,6 +236,7 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id?: number;
+  workspace_id?: string;
   created_at?: string;
   invoice_number: string;
   contact_id: number;
@@ -221,6 +258,7 @@ export interface SEOResult {
 // Academy
 export interface Course {
     id: string;
+    workspace_id?: string;
     title: string;
     description: string;
     modules: CourseModule[];
@@ -255,4 +293,67 @@ export interface VideoScene {
   image?: string; // base64
   regenerating?: boolean;
   words?: { word: string; startTime: number; endTime: number }[];
+}
+
+// Automator
+export interface Trigger {
+  type: 'time' | 'deal_stage' | 'task_created';
+  config: Record<string, any>; // e.g. { cron: "0 9 * * 1" } or { stage: "Won" }
+}
+
+export interface Action {
+  type: 'create_task' | 'send_email' | 'create_invoice' | 'ai_report';
+  config: Record<string, any>;
+}
+
+export interface Automation {
+  id: string;
+  name: string;
+  active: boolean;
+  trigger: Trigger;
+  action: Action;
+  lastRun?: string;
+}
+
+// Prospector
+export interface Prospect {
+  name: string;
+  role: string;
+  company: string;
+  email?: string;
+  linkedin?: string;
+  confidence: number;
+}
+
+export interface VersionHistory {
+  timestamp: string;
+  content: string;
+  author: string;
+}
+
+// Hiring
+export interface JobPosting {
+  id?: number;
+  workspace_id?: string;
+  title: string;
+  department: string;
+  location: string;
+  type: 'Full-time' | 'Part-time' | 'Contract';
+  status: 'Open' | 'Closed' | 'Draft';
+  description: string;
+  created_at?: string;
+}
+
+export interface Candidate {
+  id?: number;
+  workspace_id?: string;
+  job_id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  resume_text?: string;
+  stage: 'Applied' | 'Screening' | 'Interview' | 'Offer' | 'Hired' | 'Rejected';
+  fit_score?: number; // 1-10 AI Score
+  ai_summary?: string;
+  created_at?: string;
 }

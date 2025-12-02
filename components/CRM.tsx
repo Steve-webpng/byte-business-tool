@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Contact, ContactStatus, Deal, DealStage, Comment } from '../types';
 import { Icons } from '../constants';
@@ -146,7 +145,7 @@ const CRM: React.FC = () => {
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4"><Icons.Database /></div>
                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">Database Setup Required</h3>
-                <p className="text-slate-500 max-w-md mt-2">Please go to <strong>Settings -> Data Management</strong> and run the setup script to create the CRM tables.</p>
+                <p className="text-slate-500 max-w-md mt-2">Please go to <strong>Settings &rarr; Data Management</strong> and run the setup script to create the CRM tables.</p>
             </div>
         );
     }

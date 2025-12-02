@@ -1,10 +1,9 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
 import { transcribeAndAnalyzeAudioForVideo, generateImageForVideo } from '../services/geminiService';
-import { VideoScene } from '../types';
+import { VideoScene, VideoAspectRatio } from '../types';
 
 const VideoCreator: React.FC = () => {
     const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -14,6 +13,8 @@ const VideoCreator: React.FC = () => {
     const [progress, setProgress] = useState(0);
     const [statusText, setStatusText] = useState('');
     const [useGrounding, setUseGrounding] = useState(false);
+    const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
+    const [visualStyle, setVisualStyle] = useState('Cinematic');
     
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
@@ -22,12 +23,13 @@ const VideoCreator: React.FC = () => {
     
     const audioRef = useRef<HTMLAudioElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const requestRef = useRef<number>();
+    const requestRef = useRef<number>(0);
     const toast = useToast();
 
-    // Canvas Settings
-    const CANVAS_WIDTH = 1280;
-    const CANVAS_HEIGHT = 720;
+    // Dynamic Canvas Settings
+    const getCanvasDimensions = () => {
+        return aspectRatio === '16:9' ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
+    };
     const FADE_DURATION = 0.5; // seconds for cross-fade
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,7 +73,9 @@ const VideoCreator: React.FC = () => {
 
         for (let i = 0; i < updatedScenes.length; i++) {
             try {
-                const imgBase64 = await generateImageForVideo(updatedScenes[i].visualPrompt);
+                // Prepend style
+                const styledPrompt = `${visualStyle} style. ${updatedScenes[i].visualPrompt}`;
+                const imgBase64 = await generateImageForVideo(styledPrompt, aspectRatio);
                 updatedScenes[i].image = imgBase64;
                 completed++;
                 setProgress(Math.round((completed / updatedScenes.length) * 100));
@@ -92,7 +96,8 @@ const VideoCreator: React.FC = () => {
         setScenes(updatedScenes);
 
         try {
-            const imgBase64 = await generateImageForVideo(updatedScenes[sceneIndex].editablePrompt);
+            const styledPrompt = `${visualStyle} style. ${updatedScenes[sceneIndex].editablePrompt}`;
+            const imgBase64 = await generateImageForVideo(styledPrompt, aspectRatio);
             updatedScenes[sceneIndex].image = imgBase64;
         } catch (e) {
             toast.show("Failed to regenerate image.", "error");
@@ -108,32 +113,60 @@ const VideoCreator: React.FC = () => {
         setScenes(updatedScenes);
     };
 
+    // --- New Editing Functions ---
+    const handleMoveScene = (index: number, direction: -1 | 1) => {
+        if (index + direction < 0 || index + direction >= scenes.length) return;
+        const newScenes = [...scenes];
+        const temp = newScenes[index];
+        newScenes[index] = newScenes[index + direction];
+        newScenes[index + direction] = temp;
+        setScenes(newScenes);
+    };
+
+    const handleTimingChange = (index: number, field: 'startTime' | 'endTime', value: string) => {
+        const numValue = parseFloat(value);
+        if (isNaN(numValue)) return;
+        
+        const newScenes = [...scenes];
+        newScenes[index][field] = numValue;
+        setScenes(newScenes);
+    };
+    // -----------------------------
+
     const drawScene = (ctx: CanvasRenderingContext2D, scene: VideoScene, opacity = 1) => {
         if (!scene.image) return;
+        const { width, height } = getCanvasDimensions();
         ctx.globalAlpha = opacity;
         const img = new Image();
         img.src = scene.image;
-        ctx.drawImage(img, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.drawImage(img, 0, 0, width, height);
         ctx.globalAlpha = 1;
     };
 
     const drawCaptions = (ctx: CanvasRenderingContext2D, scene: VideoScene, time: number) => {
         if (!scene.words) return;
+        const { width, height } = getCanvasDimensions();
 
         // Background
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(50, CANVAS_HEIGHT - 120, CANVAS_WIDTH - 100, 80);
+        ctx.fillRect(width * 0.05, height - 120, width * 0.9, 80);
 
         ctx.font = 'bold 36px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        const lineY = CANVAS_HEIGHT - 80;
+        const lineY = height - 80;
 
         // Draw karaoke style
-        let currentX = CANVAS_WIDTH / 2; // Center alignment start
+        let currentX = width / 2; // Center alignment start
         const fullLineWidth = ctx.measureText(scene.text).width;
         currentX -= fullLineWidth / 2;
+
+        // Adjust font size if text is too wide
+        if (fullLineWidth > width * 0.8) {
+             ctx.font = 'bold 24px sans-serif';
+             currentX = width / 2 - (ctx.measureText(scene.text).width / 2);
+        }
 
         for (const word of scene.words) {
             const isSpoken = time >= word.startTime && time <= word.endTime;
@@ -148,20 +181,31 @@ const VideoCreator: React.FC = () => {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
+        const { width, height } = getCanvasDimensions();
         
         const time = audioRef.current.currentTime;
         setCurrentTime(time);
 
         ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.fillRect(0, 0, width, height);
 
-        const currentSceneIndex = scenes.findIndex(s => time >= s.startTime && time <= s.endTime);
-        const currentScene = scenes[currentSceneIndex];
-        const prevScene = scenes[currentSceneIndex - 1];
+        // Find the scene that SHOULD be playing based on time, but rely on the scenes array order for visual stack
+        // This allows reordering: The visual order is determined by the array, but trigger is time.
+        // Actually, simplest is: Find the FIRST scene where time matches range.
+        const currentScene = scenes.find(s => time >= s.startTime && time <= s.endTime);
+        const currentSceneIndex = scenes.indexOf(currentScene as VideoScene);
+        
+        // Find previous scene in the visual stack logic
+        // If we reordered, the "previous" visual is just the index before.
+        // But for smooth playback, we usually fade based on time.
         
         if (currentScene) {
             const timeIntoScene = time - currentScene.startTime;
             const isFadingIn = timeIntoScene < FADE_DURATION;
+            
+            // Draw previous scene logic if fading
+            // We'll look for a scene that ended recently
+            const prevScene = scenes.find(s => time < s.endTime + FADE_DURATION && s.endTime <= currentScene.startTime);
 
             if (isFadingIn && prevScene) {
                 const fadeOutOpacity = 1 - (timeIntoScene / FADE_DURATION);
@@ -172,9 +216,10 @@ const VideoCreator: React.FC = () => {
             drawScene(ctx, currentScene, fadeInOpacity);
             drawCaptions(ctx, currentScene, time);
         } else {
-             // Handle gaps or end of video
-            const lastScene = scenes[scenes.length-1];
-            if (lastScene) drawScene(ctx, lastScene);
+             // Fallback: draw last scene if we ran past end
+             // Or draw the scene closest to time
+             const lastScene = scenes[scenes.length-1];
+             if(lastScene && time > lastScene.endTime) drawScene(ctx, lastScene);
         }
 
         if (!audioRef.current.paused && !audioRef.current.ended) {
@@ -191,7 +236,7 @@ const VideoCreator: React.FC = () => {
             const ctx = canvas?.getContext('2d');
             if(ctx) drawScene(ctx, scenes[0]);
         }
-    }, [scenes]);
+    }, [scenes, aspectRatio]); // Redraw if ratio changes
 
 
     const togglePlay = () => {
@@ -253,25 +298,27 @@ const VideoCreator: React.FC = () => {
         };
     };
 
+    const { width: canvasW, height: canvasH } = getCanvasDimensions();
+
     return (
         <div className="h-full flex flex-col max-w-7xl mx-auto">
             <div className="mb-6">
                 <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <Icons.Film /> AI Video Studio
+                    <Icons.Film /> AI Video Studio Pro
                 </h2>
-                <p className="text-slate-500 dark:text-slate-400">Turn audio into a captioned video with AI-generated visuals.</p>
+                <p className="text-slate-500 dark:text-slate-400">Turn audio into professional videos for any platform.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
                 {/* Left: Input & Storyboard */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase mb-4">1. Source Audio</h3>
+                        <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase mb-4">1. Configuration</h3>
                         
                         {!audioFile ? (
                              <div 
                                 onClick={() => document.getElementById('audio-upload')?.click()}
-                                className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
+                                className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors mb-4"
                             >
                                 <div className="mx-auto w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mb-2">
                                     <Icons.Upload />
@@ -280,7 +327,7 @@ const VideoCreator: React.FC = () => {
                                 <input type="file" id="audio-upload" accept="audio/*" className="hidden" onChange={handleFileChange} />
                             </div>
                         ) : (
-                             <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                             <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-700 mb-4">
                                 <div className="truncate text-sm font-medium text-slate-700 dark:text-slate-300">{audioFile.name}</div>
                                 <button onClick={() => { setAudioFile(null); setAudioUrl(null); setScenes([]); }} className="text-red-500 hover:bg-red-50 p-1 rounded">
                                     <Icons.X />
@@ -289,8 +336,39 @@ const VideoCreator: React.FC = () => {
                         )}
 
                         {audioFile && (
-                            <div className="mt-4">
-                                <div className="flex items-center gap-2 mb-4">
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Format</label>
+                                        <select 
+                                            value={aspectRatio}
+                                            onChange={(e) => setAspectRatio(e.target.value as VideoAspectRatio)}
+                                            className="w-full p-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
+                                            disabled={scenes.length > 0}
+                                        >
+                                            <option value="16:9">Landscape (YouTube)</option>
+                                            <option value="9:16">Portrait (TikTok/Shorts)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Visual Style</label>
+                                        <select 
+                                            value={visualStyle}
+                                            onChange={(e) => setVisualStyle(e.target.value)}
+                                            className="w-full p-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
+                                        >
+                                            <option value="Cinematic">Cinematic</option>
+                                            <option value="Anime">Anime</option>
+                                            <option value="3D Render">3D Render</option>
+                                            <option value="Minimalist Line Art">Minimalist</option>
+                                            <option value="Watercolor">Watercolor</option>
+                                            <option value="Cyberpunk">Cyberpunk</option>
+                                            <option value="Pixel Art">Pixel Art</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
                                     <input 
                                         type="checkbox" 
                                         id="grounding" 
@@ -299,9 +377,10 @@ const VideoCreator: React.FC = () => {
                                         className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label htmlFor="grounding" className="text-xs text-slate-600 dark:text-slate-400 select-none">
-                                        Use Google Search to find factual visuals?
+                                        Use Google Search for factual imagery
                                     </label>
                                 </div>
+
                                 <button
                                     onClick={processAudio}
                                     disabled={loading || scenes.length > 0}
@@ -334,7 +413,8 @@ const VideoCreator: React.FC = () => {
                             {scenes.map((scene, i) => (
                                 <div key={i} className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-slate-100 dark:border-slate-800">
                                     <div className="flex gap-3">
-                                        <div className="w-24 h-14 bg-slate-200 dark:bg-slate-700 rounded flex-shrink-0 overflow-hidden relative group">
+                                        {/* Image */}
+                                        <div className={`bg-slate-200 dark:bg-slate-700 rounded flex-shrink-0 overflow-hidden relative group ${aspectRatio === '16:9' ? 'w-24 h-14' : 'w-14 h-24'}`}>
                                             {scene.image ? <img src={scene.image} alt="scene" className="w-full h-full object-cover" /> : 
                                                 <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
                                                     {scene.regenerating || loading ? <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent animate-spin rounded-full"></div> : '...'}
@@ -344,15 +424,49 @@ const VideoCreator: React.FC = () => {
                                                 <Icons.Loop />
                                             </button>
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-xs font-mono text-blue-500 mb-0.5">{scene.startTime.toFixed(1)}s - {scene.endTime.toFixed(1)}s</div>
+                                        
+                                        {/* Reorder Controls */}
+                                        <div className="flex flex-col justify-center gap-1">
+                                            <button onClick={() => handleMoveScene(i, -1)} className="p-1 text-slate-400 hover:text-blue-500 disabled:opacity-30" disabled={i===0}>
+                                                <Icons.ChevronUp />
+                                            </button>
+                                            <button onClick={() => handleMoveScene(i, 1)} className="p-1 text-slate-400 hover:text-blue-500 disabled:opacity-30" disabled={i===scenes.length-1}>
+                                                <Icons.ChevronDown />
+                                            </button>
+                                        </div>
+
+                                        {/* Details & Timing */}
+                                        <div className="min-w-0 flex-1 flex flex-col justify-between">
                                             <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2" title={scene.text}>"{scene.text}"</div>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Start</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-12 p-1 text-[10px] border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-center" 
+                                                        value={scene.startTime}
+                                                        onChange={(e) => handleTimingChange(i, 'startTime', e.target.value)}
+                                                        step="0.1"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase">End</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-12 p-1 text-[10px] border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-center" 
+                                                        value={scene.endTime}
+                                                        onChange={(e) => handleTimingChange(i, 'endTime', e.target.value)}
+                                                        step="0.1"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <textarea 
                                         value={scene.editablePrompt}
                                         onChange={e => handlePromptChange(i, e.target.value)}
                                         className="w-full text-[10px] p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded h-10 resize-none font-mono"
+                                        placeholder="Visual Prompt"
                                     />
                                 </div>
                             ))}
@@ -362,11 +476,11 @@ const VideoCreator: React.FC = () => {
 
                 {/* Right: Preview & Render */}
                 <div className="lg:col-span-1 flex flex-col gap-6">
-                    <div className="bg-black rounded-xl overflow-hidden aspect-video relative group shadow-2xl border border-slate-800">
+                    <div className="bg-black rounded-xl overflow-hidden relative group shadow-2xl border border-slate-800 flex items-center justify-center bg-zinc-900" style={{aspectRatio: aspectRatio === '16:9' ? '16/9' : '9/16'}}>
                         <canvas 
                             ref={canvasRef} 
-                            width={CANVAS_WIDTH} 
-                            height={CANVAS_HEIGHT} 
+                            width={canvasW} 
+                            height={canvasH} 
                             className="w-full h-full object-contain"
                         />
                         
@@ -400,7 +514,7 @@ const VideoCreator: React.FC = () => {
                     <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                         <div>
                             <h3 className="font-bold text-slate-800 dark:text-slate-200">Export Video</h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Render the final video file.</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Render MP4 ({aspectRatio})</p>
                         </div>
                         <div className="flex gap-3">
                             {videoBlob && (

@@ -1,8 +1,7 @@
 
-
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene, VideoAspectRatio, SWOTAnalysis } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 import { getSavedItems } from "./supabaseService";
 
@@ -33,6 +32,13 @@ export const generateMarketingContent = async (topic: string, type: string, tone
   return response.text || "No content generated.";
 };
 
+export const analyzeBrandVoice = async (sampleText: string): Promise<string> => {
+    const ai = getAIClient();
+    const prompt = `Analyze the following text sample to determine the author's unique "Brand Voice" and "Style".\n\nSAMPLE:\n"${sampleText.substring(0, 1000)}..."\n\nOutput a concise but descriptive "Tone Instruction" string (approx 20 words) that describes this style (e.g. "Witty, punchy, uses emojis, speaks directly to the reader, informal but authoritative").`;
+    const response = await ai.models.generateContent({ model: getModel(), contents: prompt });
+    return response.text || "Professional and clear.";
+};
+
 export const generateMarketingCampaign = async (topic: string, tone: string, context?: string): Promise<MarketingCampaign> => {
   const ai = getAIClient();
   const prompt = `${context || ''}\nTopic: ${topic}\nTone: ${tone}\n\nCreate a multi-channel marketing campaign.\n1. An Email (Subject + Body)\n2. A LinkedIn Post\n3. A Twitter Thread (Array of strings)\n\nReturn strict JSON.`;
@@ -58,7 +64,7 @@ export const generateMarketingCampaign = async (topic: string, tone: string, con
 
 export const analyzeSEO = async (content: string): Promise<SEOResult> => {
     const ai = getAIClient();
-    const prompt = `Analyze the following content for SEO effectiveness.\nContent: "${content.substring(0, 2000)}..."\n\nProvide:\n1. A Score (0-100).\n2. Detected Keywords (top 5).\n3. Suggestions for improvement (max 3).\n4. Readability Grade (e.g., "8th Grade", "University").\n\nReturn strict JSON.`;
+    const prompt = `Analyze the following content for SEO effectiveness.\nContent: "${content.substring(0, 2000)}..."\n\nProvide:\n1. A Score (0-100).\n2. Detected Keywords (top 5).\n3. Suggestions for improvement (max 3).\n4. Readability Grade (e.g. "8th Grade", "University").\n\nReturn strict JSON.`;
     const response = await ai.models.generateContent({
         model: getModel(),
         contents: prompt,
@@ -103,14 +109,14 @@ export const generateImage = async (prompt: string): Promise<string> => {
   throw new Error("No image generated. The model may have refused the prompt due to safety filters.");
 };
 
-// New function for Video Images (16:9)
-export const generateImageForVideo = async (prompt: string): Promise<string> => {
+// New function for Video Images (16:9 or 9:16)
+export const generateImageForVideo = async (prompt: string, aspectRatio: VideoAspectRatio = '16:9'): Promise<string> => {
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "16:9" } } // 16:9 for Video
+      config: { imageConfig: { aspectRatio: aspectRatio } }
     });
     if (response.candidates?.[0]?.content?.parts) {
       for (const part of response.candidates[0].content.parts) {
@@ -196,6 +202,24 @@ export const generateContactInsights = async (contact: Contact): Promise<string>
     return response.text || "No insights generated.";
 };
 
+export const enrichContactData = async (contact: Contact): Promise<string> => {
+    const ai = getAIClient();
+    const prompt = `Use Google Search to find professional information about: "${contact.name} ${contact.company} ${contact.role}".
+    Look for:
+    1. LinkedIn Headline / Current Role details
+    2. Company description (1 sentence)
+    3. Recent company news or events
+    
+    Return a concise summary paragraph I can add to my CRM notes.`;
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }] },
+    });
+    return response.text || "No enrichment data found.";
+};
+
 export const generateFollowUpEmail = async (contact: Contact, context?: string): Promise<string> => {
     const ai = getAIClient();
     const prompt = `${context || ''}\n\nWrite a polite, professional, and personalized follow-up email to this contact.\nRECIPIENT:\nName: ${contact.name}\nCompany: ${contact.company}\nRole: ${contact.role}\n\nOutput ONLY the email body text.`;
@@ -256,7 +280,17 @@ export const generateDailyBriefing = async (context: string): Promise<string> =>
 export const performMarketResearch = async (query: string, context?: string, mode: string = 'general') => {
   const ai = getAIClient();
   let instruction = `Using the Google Search tool, find real-time information to answer: "${query}".`;
-  if (mode === 'competitor') instruction += `\nFocus on direct competitors. Provide a Competitor Matrix.`;
+  
+  if (mode === 'competitor') {
+      instruction += `\nFocus on direct competitors. Provide a Competitor Matrix.`;
+  } else if (mode === 'trends') {
+      instruction += `\nFocus on identifying rising trends, viral topics, and market shifts related to the query. Provide a 'Trend Report' with bullet points on:
+      - Social Media Buzz
+      - Search Interest
+      - Consumer Behavior Shifts
+      - Future Outlook`;
+  }
+
   const prompt = context ? `${context}\n\n${instruction}` : instruction;
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -264,6 +298,30 @@ export const performMarketResearch = async (query: string, context?: string, mod
     config: { tools: [{ googleSearch: {} }] },
   });
   return { text: response.text || "No insights found.", groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [] };
+};
+
+export const generateSWOTAnalysis = async (topic: string, context?: string): Promise<SWOTAnalysis> => {
+    const ai = getAIClient();
+    const prompt = `${context || ''}\n\nPerform a SWOT Analysis for: "${topic}".\nReturn strict JSON with arrays for strengths, weaknesses, opportunities, threats.`;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    opportunities: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    threats: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ["strengths", "weaknesses", "opportunities", "threats"]
+            }
+        }
+    });
+    return JSON.parse(response.text || "{}") as SWOTAnalysis;
 };
 
 export const analyzeData = async (textPrompt: string, imageBase64?: string): Promise<AnalysisResult> => {
@@ -337,7 +395,7 @@ export const transcribeAndAnalyzeAudioForVideo = async (base64Audio: string, use
         1. "startTime" (in seconds, e.g. 0.0)
         2. "endTime" (in seconds)
         3. "text" (the spoken text segment for the scene)
-        4. "visualPrompt" (A detailed, descriptive prompt to generate a 16:9 image for this scene. It should describe the setting, objects, and mood. No text overlays.)
+        4. "visualPrompt" (A detailed, descriptive prompt to generate a 16:9 or 9:16 image for this scene. It should describe the setting, objects, and mood. No text overlays.)
         5. "words" (An array of objects with "word", "startTime", and "endTime" for the scene's text)
         
         Return a JSON array of scene objects.

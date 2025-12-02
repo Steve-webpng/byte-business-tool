@@ -20,20 +20,29 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
   const [newPriority, setNewPriority] = useState<Task['priority']>('Medium');
   const [newDate, setNewDate] = useState('');
   const [newProject, setNewProject] = useState('');
+  const [newTags, setNewTags] = useState('');
   
   // Filters
   const [filterProject, setFilterProject] = useState('All Projects');
   const [filterPriority, setFilterPriority] = useState('All');
+  const [filterTag, setFilterTag] = useState('All Tags');
 
   const [loading, setLoading] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [editTagInput, setEditTagInput] = useState('');
   const toast = useToast();
   const users = getUsers();
 
-  // Get unique projects
+  // Get unique projects & tags
   const uniqueProjects = useMemo(() => {
       const projects = new Set(tasks.map(t => t.project).filter(Boolean));
       return ['All Projects', ...Array.from(projects).sort()];
+  }, [tasks]);
+
+  const uniqueTags = useMemo(() => {
+      const tags = new Set<string>();
+      tasks.forEach(t => t.tags?.forEach(tag => tags.add(tag)));
+      return ['All Tags', ...Array.from(tags).sort()];
   }, [tasks]);
 
   // Filtered Tasks
@@ -41,23 +50,27 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
       return tasks.filter(t => {
           const matchProject = filterProject === 'All Projects' || t.project === filterProject;
           const matchPriority = filterPriority === 'All' || t.priority === filterPriority;
-          return matchProject && matchPriority;
+          const matchTag = filterTag === 'All Tags' || t.tags?.includes(filterTag);
+          return matchProject && matchPriority && matchTag;
       });
-  }, [tasks, filterProject, filterPriority]);
+  }, [tasks, filterProject, filterPriority, filterTag]);
 
   const handleAddTask = async () => {
       if (!input.trim()) return;
+      const tags = newTags.split(',').map(t => t.trim()).filter(Boolean);
       const newTask: Task = {
           id: `task-${Date.now()}`,
           title: input,
           priority: newPriority,
           dueDate: newDate || undefined,
           columnId: 'todo',
-          project: newProject.trim() || undefined
+          project: newProject.trim() || undefined,
+          tags: tags.length > 0 ? tags : undefined
       };
       await saveTask(newTask);
       await refreshTasks();
       setInput('');
+      setNewTags('');
       toast.show("Task added successfully", "success");
   };
 
@@ -130,11 +143,20 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
   const handleUpdateTask = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editTask) return;
-      await saveTask(editTask);
+      // Process tags
+      const processedTags = editTagInput.split(',').map(t => t.trim()).filter(Boolean);
+      const updated = { ...editTask, tags: processedTags };
+      
+      await saveTask(updated);
       await refreshTasks();
       setEditTask(null);
       toast.show("Task updated", "success");
   };
+
+  const openEditModal = (task: Task) => {
+      setEditTask(task);
+      setEditTagInput(task.tags?.join(', ') || '');
+  }
 
   const moveTask = async (task: Task, direction: 'forward' | 'backward') => {
       let newCol = task.columnId;
@@ -202,16 +224,22 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
                       return (
                       <div 
                         key={task.id} 
-                        onClick={() => setEditTask(task)}
+                        onClick={() => openEditModal(task)}
                         className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all group cursor-pointer relative"
                       >
-                          {task.project && (
-                              <div className="mb-2">
+                          <div className="flex flex-wrap gap-1 mb-2">
+                              {task.project && (
                                   <span className="text-[9px] font-bold uppercase tracking-wider text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md">
                                       {task.project}
                                   </span>
-                              </div>
-                          )}
+                              )}
+                              {task.tags && task.tags.map(tag => (
+                                  <span key={tag} className="text-[9px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
+                                      #{tag}
+                                  </span>
+                              ))}
+                          </div>
+                          
                           <div className="flex justify-between items-start mb-2">
                               <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-lg border ${getPriorityColor(task.priority)}`}>
                                   {task.priority}
@@ -316,6 +344,13 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
                 </select>
+                <select 
+                    value={filterTag}
+                    onChange={(e) => setFilterTag(e.target.value)}
+                    className="text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:border-blue-400"
+                >
+                    {uniqueTags.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
                 <div className="flex-1"></div>
                 <div className="text-xs text-slate-400 font-mono py-2">
                     Showing {filteredTasks.length} of {tasks.length} tasks
@@ -344,7 +379,14 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
                             type="text"
                             value={newProject}
                             onChange={(e) => setNewProject(e.target.value)}
-                            placeholder="Project Name"
+                            placeholder="Project"
+                            className="text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300 w-24"
+                        />
+                        <input 
+                            type="text"
+                            value={newTags}
+                            onChange={(e) => setNewTags(e.target.value)}
+                            placeholder="Tags (comma sep)"
                             className="text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300 w-32"
                         />
                         <select 
@@ -362,7 +404,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
                             onChange={(e) => setNewDate(e.target.value)}
                             className="text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300"
                         />
-                        {input.toLowerCase().startsWith('ai:') || input.toLowerCase().startsWith('generate') ? (
+                        {input.toLowerCase().startsWith('AI:') || input.toLowerCase().startsWith('generate') ? (
                             <button 
                                 onClick={handleGenerate}
                                 disabled={loading || !input}
@@ -394,7 +436,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
         {/* Edit Modal */}
         {editTask && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl p-6 border border-slate-200 dark:border-slate-700">
+                <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl p-6 border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">Edit Task</h3>
                         <button onClick={() => setEditTask(null)} className="text-slate-400 hover:text-slate-600"><Icons.X /></button>
@@ -409,15 +451,27 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, refreshTasks
                                 className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
                             />
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Project</label>
-                            <input 
-                                type="text" 
-                                value={editTask.project || ''} 
-                                onChange={(e) => setEditTask({...editTask, project: e.target.value})}
-                                placeholder="Project Name (Optional)"
-                                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Project</label>
+                                <input 
+                                    type="text" 
+                                    value={editTask.project || ''} 
+                                    onChange={(e) => setEditTask({...editTask, project: e.target.value})}
+                                    placeholder="Project Name (Optional)"
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Tags</label>
+                                <input 
+                                    type="text" 
+                                    value={editTagInput}
+                                    onChange={(e) => setEditTagInput(e.target.value)}
+                                    placeholder="e.g. urgent, marketing"
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>

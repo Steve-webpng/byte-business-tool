@@ -1,8 +1,9 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
-import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData, analyzeSEO, editContentWithAI } from '../services/geminiService';
+import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData, analyzeSEO, editContentWithAI, analyzeBrandVoice } from '../services/geminiService';
 import { saveItem, getSupabaseConfig, getSavedItems } from '../services/supabaseService';
-import { getProfile, formatProfileForPrompt } from '../services/settingsService';
+import { getProfile, formatProfileForPrompt, getCustomVoices, saveCustomVoice, deleteCustomVoice } from '../services/settingsService';
 import { MarketingCampaign, SavedItem, AppTool, SEOResult } from '../types';
 import { Icons } from '../constants';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -22,19 +23,24 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
   const [type, setType] = useState('Email');
   const [tone, setTone] = useState('Professional');
   const [customTone, setCustomTone] = useState('');
-  const [mode, setMode] = useState<'Single' | 'Campaign' | 'Image'>('Single');
+  const [mode, setMode] = useState<'Single' | 'Campaign' | 'Image' | 'VoiceMatch'>('Single');
   const [generatedText, setGeneratedText] = useState('');
   const [generatedImage, setGeneratedImage] = useState('');
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
   const [activeTab, setActiveTab] = useState<'email' | 'linkedin' | 'twitter'>('email');
+  const [showPreview, setShowPreview] = useState(false);
   const [recentDrafts, setRecentDrafts] = useState<SavedItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  // Custom Tones
+  const [savedTones, setSavedTones] = useState<string[]>([]);
+  
   // Power-up states
   const [seoResult, setSeoResult] = useState<SEOResult | null>(null);
   const [seoLoading, setSeoLoading] = useState(false);
+  const [voiceSample, setVoiceSample] = useState('');
   
   // Audio state
   const [speaking, setSpeaking] = useState(false);
@@ -53,6 +59,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
       clearWorkflowData();
     }
     refreshHistory();
+    setSavedTones(getCustomVoices());
   }, [workflowData, clearWorkflowData]);
 
   // Cleanup audio on unmount
@@ -68,8 +75,21 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
       setRecentDrafts(items.filter(i => i.tool_type === 'Content').slice(0, 5));
   }
 
+  const handleSaveCustomTone = () => {
+      if(!customTone) return;
+      saveCustomVoice(customTone);
+      setSavedTones(getCustomVoices());
+      toast.show("Custom tone saved!", "success");
+  }
+
+  const handleDeleteCustomTone = (t: string) => {
+      deleteCustomVoice(t);
+      setSavedTones(getCustomVoices());
+      toast.show("Custom tone deleted.", "info");
+  }
+
   const handleGenerate = async () => {
-    if (!topic) return;
+    if (!topic && mode !== 'VoiceMatch') return;
     setLoading(true);
     setGeneratedText('');
     setGeneratedImage('');
@@ -88,6 +108,13 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
           const camp = await generateMarketingCampaign(topic, finalTone, context);
           setCampaign(camp);
           setActiveTab('email');
+      } else if (mode === 'VoiceMatch') {
+          if(!voiceSample) throw new Error("Please enter sample text.");
+          const voiceAnalysis = await analyzeBrandVoice(voiceSample);
+          setCustomTone(voiceAnalysis);
+          setTone('Custom');
+          setMode('Single'); // Switch back to generator with new tone
+          toast.show("Brand voice extracted! You can now generate content.", "success");
       } else {
           const text = await generateMarketingContent(topic, type, finalTone, context);
           setGeneratedText(text);
@@ -271,21 +298,27 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                 <button 
                     onClick={() => setMode('Single')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Single' ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Single' ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     Text
                 </button>
                 <button 
                     onClick={() => setMode('Campaign')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Campaign' ? 'bg-white dark:bg-slate-700 shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Campaign' ? 'bg-white dark:bg-slate-700 shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     Campaign
                 </button>
                 <button 
                     onClick={() => setMode('Image')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Image' ? 'bg-white dark:bg-slate-700 shadow text-pink-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Image' ? 'bg-white dark:bg-slate-700 shadow text-pink-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     Image
+                </button>
+                <button 
+                    onClick={() => setMode('VoiceMatch')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'VoiceMatch' ? 'bg-white dark:bg-slate-700 shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Voice Match
                 </button>
              </div>
           </div>
@@ -303,90 +336,126 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
         {/* Controls */}
         <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col ${isWidget ? 'p-3' : 'p-6 h-fit lg:col-span-4'}`}>
           
-          {mode !== 'Image' && (
+          {mode === 'VoiceMatch' ? (
+              <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">Brand Voice Clone</h3>
+                  <p className="text-xs text-slate-500">Paste a sample of your writing (blog post, email, etc.). The AI will analyze your style and create a custom tone preset.</p>
+                  <textarea 
+                      value={voiceSample}
+                      onChange={e => setVoiceSample(e.target.value)}
+                      className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 h-32"
+                      placeholder="Paste your writing sample here..."
+                  />
+                  <button onClick={handleGenerate} disabled={loading || !voiceSample} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700">
+                      {loading ? 'Analyzing...' : 'Extract Style'}
+                  </button>
+              </div>
+          ) : (
               <>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Format</label>
-                        <select 
-                            value={type}
-                            onChange={(e) => setType(e.target.value)}
-                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
-                        >
-                            <option>Email</option>
-                            <option>LinkedIn Post</option>
-                            <option>Twitter Thread</option>
-                            <option>Blog Post</option>
-                            <option>Press Release</option>
-                            <option>Ad Copy</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Tone</label>
-                        <select 
-                            value={tone}
-                            onChange={(e) => { setTone(e.target.value); if(e.target.value !== 'Custom') setCustomTone(''); }}
-                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
-                        >
-                            <option>Professional</option>
-                            <option>Friendly</option>
-                            <option>Persuasive</option>
-                            <option>Witty</option>
-                            <option>Urgent</option>
-                            <option>Custom</option>
-                        </select>
-                    </div>
-                </div>
-                {tone === 'Custom' && (
-                    <div className="mb-4">
-                        <input 
-                            type="text" 
-                            value={customTone}
-                            onChange={(e) => setCustomTone(e.target.value)}
-                            placeholder="e.g. 'Like Steve Jobs'"
-                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 outline-none"
-                        />
-                    </div>
+                {mode !== 'Image' && (
+                    <>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Format</label>
+                                <select 
+                                    value={type}
+                                    onChange={(e) => setType(e.target.value)}
+                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
+                                >
+                                    <option>Email</option>
+                                    <option>LinkedIn Post</option>
+                                    <option>Twitter Thread</option>
+                                    <option>Blog Post</option>
+                                    <option>Press Release</option>
+                                    <option>Ad Copy</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Tone</label>
+                                <select 
+                                    value={tone}
+                                    onChange={(e) => { 
+                                        const val = e.target.value;
+                                        setTone(val);
+                                        if(val !== 'Custom') {
+                                            const saved = savedTones.find(t => t === val);
+                                            setCustomTone(saved || ''); 
+                                        } else {
+                                            setCustomTone('');
+                                        }
+                                    }}
+                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
+                                >
+                                    <option>Professional</option>
+                                    <option>Friendly</option>
+                                    <option>Persuasive</option>
+                                    <option>Witty</option>
+                                    <option>Urgent</option>
+                                    <optgroup label="Saved Voices">
+                                        {savedTones.map(t => <option key={t} value={t}>{t.substring(0, 15)}...</option>)}
+                                    </optgroup>
+                                    <option value="Custom">Custom / New</option>
+                                </select>
+                            </div>
+                        </div>
+                        {(tone === 'Custom' || savedTones.includes(tone)) && (
+                            <div className="mb-4">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Voice Description</label>
+                                <textarea 
+                                    value={customTone}
+                                    onChange={(e) => { setCustomTone(e.target.value); setTone('Custom'); }}
+                                    placeholder="e.g. 'Like Steve Jobs' or paste analysis"
+                                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-slate-50 dark:bg-slate-900 outline-none h-16 mb-2"
+                                />
+                                <div className="flex gap-2">
+                                    <button onClick={handleSaveCustomTone} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">Save Tone</button>
+                                    {savedTones.includes(customTone) && (
+                                        <button onClick={() => handleDeleteCustomTone(customTone)} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200">Delete</button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
+
+                <div className="space-y-5">
+                    <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 flex justify-between">
+                        <span>Topic / Prompt</span>
+                        <button onClick={toggleDictation} className={`${isDictating ? 'text-red-500 animate-pulse' : 'text-slate-400 hover:text-blue-500'}`} title="Dictate">
+                            <Icons.Mic />
+                        </button>
+                    </label>
+                    <textarea
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        className={`w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 ${isWidget ? 'h-20 text-sm' : 'min-h-[140px]'}`}
+                        placeholder={isDictating ? "Listening..." : "e.g. Announce a summer sale..."}
+                    />
+                    </div>
+
+                    <button
+                        onClick={handleGenerate}
+                        disabled={loading || !topic}
+                        className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg
+                            ${loading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 
+                            mode === 'Image' ? 'bg-pink-600 hover:bg-pink-700' : 
+                            mode === 'Campaign' ? 'bg-purple-600 hover:bg-purple-700' :
+                            'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                    >
+                        {loading ? (
+                            <span className="flex items-center justify-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Generating...
+                            </span>
+                        ) : (
+                            mode === 'Image' ? 'Generate Image' : 'Generate Content'
+                        )}
+                    </button>
+                </div>
               </>
           )}
-
-          <div className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 flex justify-between">
-                  <span>Topic / Prompt</span>
-                  <button onClick={toggleDictation} className={`${isDictating ? 'text-red-500 animate-pulse' : 'text-slate-400 hover:text-blue-500'}`} title="Dictate">
-                      <Icons.Mic />
-                  </button>
-              </label>
-              <textarea
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className={`w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 ${isWidget ? 'h-20 text-sm' : 'min-h-[140px]'}`}
-                placeholder={isDictating ? "Listening..." : "e.g. Announce a summer sale..."}
-              />
-            </div>
-
-            <button
-                onClick={handleGenerate}
-                disabled={loading || !topic}
-                className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg
-                    ${loading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 
-                      mode === 'Image' ? 'bg-pink-600 hover:bg-pink-700' : 
-                      mode === 'Campaign' ? 'bg-purple-600 hover:bg-purple-700' :
-                      'bg-blue-600 hover:bg-blue-700'
-                    }`}
-            >
-                {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Generating...
-                    </span>
-                ) : (
-                    mode === 'Image' ? 'Generate Image' : 'Generate Content'
-                )}
-            </button>
-          </div>
         </div>
 
         {/* Output */}
@@ -396,6 +465,14 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                 {mode === 'Image' ? <Icons.Photo /> : <Icons.DocumentText />} Result
             </h3>
             <div className="flex gap-2 items-center">
+                 {generatedText && mode !== 'Image' && (
+                     <button
+                        onClick={() => setShowPreview(!showPreview)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border ${showPreview ? 'bg-blue-100 text-blue-700 border-blue-200' : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50'}`}
+                     >
+                         {showPreview ? 'Edit' : 'Preview'}
+                     </button>
+                 )}
                  {onWorkflowSend && (generatedText || campaign) && (
                     <button onClick={() => {
                         let data = generatedText;
@@ -498,54 +575,81 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
             ) : (
                 generatedText ? (
                     <>
-                        {seoResult && (
-                            <div className="mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h4 className="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase flex items-center gap-2"><Icons.Chart /> SEO Score</h4>
-                                    <span className={`text-sm font-bold px-2 py-1 rounded ${seoResult.score > 70 ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{seoResult.score}/100</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-400 mb-3">
-                                    <div>
-                                        <strong>Readability:</strong> {seoResult.readability}
+                        {showPreview ? (
+                            <div className="flex flex-col items-center justify-center h-full">
+                                <div className="bg-white rounded-lg shadow border border-gray-200 w-full max-w-md p-4">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+                                        <div>
+                                            <div className="h-3 w-24 bg-gray-200 rounded mb-1"></div>
+                                            <div className="h-2 w-16 bg-gray-100 rounded"></div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <strong>Keywords:</strong> {seoResult.keywords.join(', ')}
+                                    <div className="text-sm text-gray-800 space-y-2 whitespace-pre-wrap">
+                                        {generatedText}
+                                    </div>
+                                    <div className="h-48 bg-gray-100 rounded mt-3 flex items-center justify-center text-gray-400 text-xs">Image Placeholder</div>
+                                    <div className="flex justify-between mt-3 px-2">
+                                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
                                     </div>
                                 </div>
-                                {seoResult.suggestions.length > 0 && (
-                                    <div className="text-xs bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-700">
-                                        <strong className="block mb-1 text-slate-500">Suggestions:</strong>
-                                        <ul className="list-disc pl-4 space-y-1">
-                                            {seoResult.suggestions.map((s, i) => <li key={i}>{s}</li>)}
-                                        </ul>
+                                <p className="text-xs text-slate-400 mt-4">Simulated Social Media Preview</p>
+                            </div>
+                        ) : (
+                            <>
+                                {seoResult && (
+                                    <div className="mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase flex items-center gap-2"><Icons.Chart /> SEO Score</h4>
+                                            <span className={`text-sm font-bold px-2 py-1 rounded ${seoResult.score > 70 ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{seoResult.score}/100</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-400 mb-3">
+                                            <div>
+                                                <strong>Readability:</strong> {seoResult.readability}
+                                            </div>
+                                            <div>
+                                                <strong>Keywords:</strong> {seoResult.keywords.join(', ')}
+                                            </div>
+                                        </div>
+                                        {seoResult.suggestions.length > 0 && (
+                                            <div className="text-xs bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-700">
+                                                <strong className="block mb-1 text-slate-500">Suggestions:</strong>
+                                                <ul className="list-disc pl-4 space-y-1">
+                                                    {seoResult.suggestions.map((s, i) => <li key={i}>{s}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
-                            </div>
+                                <MarkdownRenderer content={generatedText} />
+                                
+                                {/* Power-Up Toolbar */}
+                                <div className="absolute bottom-4 right-4 flex gap-2">
+                                    <button 
+                                        onClick={handleAnalyzeSEO} 
+                                        disabled={seoLoading}
+                                        className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
+                                    >
+                                        {seoLoading ? 'Analyzing...' : <><Icons.Chart /> Check SEO</>}
+                                    </button>
+                                    <button 
+                                        onClick={() => handleModifyText("Translate this to Spanish")}
+                                        className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
+                                    >
+                                        <Icons.Globe /> Translate
+                                    </button>
+                                    <button 
+                                        onClick={() => handleModifyText("Make this text shorter and more punchy")}
+                                        className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700"
+                                    >
+                                        Shorten
+                                    </button>
+                                </div>
+                            </>
                         )}
-                        <MarkdownRenderer content={generatedText} />
-                        
-                        {/* Power-Up Toolbar */}
-                        <div className="absolute bottom-4 right-4 flex gap-2">
-                            <button 
-                                onClick={handleAnalyzeSEO} 
-                                disabled={seoLoading}
-                                className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
-                            >
-                                {seoLoading ? 'Analyzing...' : <><Icons.Chart /> Check SEO</>}
-                            </button>
-                            <button 
-                                onClick={() => handleModifyText("Translate this to Spanish")}
-                                className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
-                            >
-                                <Icons.Globe /> Translate
-                            </button>
-                            <button 
-                                onClick={() => handleModifyText("Make this text shorter and more punchy")}
-                                className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700"
-                            >
-                                Shorten
-                            </button>
-                        </div>
                     </>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">

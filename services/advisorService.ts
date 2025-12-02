@@ -5,6 +5,16 @@ import { Task, Invoice } from '../types';
 import { getEvents } from './calendarService';
 import { isToday, isPast, parseISO } from 'date-fns';
 
+const MEMORY_KEY = 'byete_strategy_memory';
+
+export const getStrategicMemory = (): string => {
+    return localStorage.getItem(MEMORY_KEY) || "";
+};
+
+export const updateStrategicMemory = (memory: string) => {
+    localStorage.setItem(MEMORY_KEY, memory);
+};
+
 export const getAdvisorContext = async (): Promise<string> => {
   const profile = getProfile();
   
@@ -31,10 +41,15 @@ export const getAdvisorContext = async (): Promise<string> => {
   const totalExpenses = expenses.reduce((acc, e) => acc + Number(e.amount), 0);
   const netCash = paidRevenue - totalExpenses;
 
+  const memory = getStrategicMemory();
+
   let context = `You are the Chief of Staff and Strategic Advisor for a business. 
   Your goal is to help the user manage their operations, suggest tasks, write content, and provide strategic advice.
   
   You have access to real-time business metrics. USE THEM.
+  
+  --- LONG-TERM STRATEGIC MEMORY (Important Goals) ---
+  ${memory || "No strategic goals set yet. Ask the user for their quarterly focus."}
   
   --- FINANCIAL HEALTH SNAPSHOT ---
   - Total Revenue (Paid Invoices): $${paidRevenue.toLocaleString()}
@@ -103,10 +118,15 @@ export const getDailyContext = async (): Promise<string> => {
     const invoices = await getInvoices();
     const overdueInvoices = invoices.filter(i => i.status === 'Overdue');
 
+    // Memory
+    const memory = getStrategicMemory();
+
     let context = `Today is ${today.toLocaleDateString()}.
     
     Business: ${profile?.name || 'My Business'}
     User Role: Owner/Executive
+    
+    STRATEGIC FOCUS: ${memory || "None set."}
     
     -- TODAY'S AGENDA --
     

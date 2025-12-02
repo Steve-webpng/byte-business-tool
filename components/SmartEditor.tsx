@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../constants';
 import { editContentWithAI } from '../services/geminiService';
@@ -27,6 +29,7 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const toast = useToast();
 
@@ -133,30 +136,53 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
     }
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '', 'width=800,height=600');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>${title}</title>
-            <style>
-              body { font-family: sans-serif; padding: 40px; line-height: 1.6; max-width: 800px; margin: 0 auto; }
-              h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
-              p { white-space: pre-wrap; }
-            </style>
-          </head>
-          <body>
-            <h1>${title}</h1>
-            <p>${content}</p>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    }
+  const handleExportFile = (format: 'pdf' | 'md' | 'html' | 'txt') => {
+      const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      
+      if (format === 'pdf') {
+          // Simple print-to-pdf trigger
+          const printWindow = window.open('', '', 'width=800,height=600');
+          if (printWindow) {
+            printWindow.document.write(`
+              <html>
+                <head>
+                  <title>${title}</title>
+                  <style>
+                    body { font-family: sans-serif; padding: 40px; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+                    h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                    p { white-space: pre-wrap; }
+                  </style>
+                </head>
+                <body>
+                  <h1>${title}</h1>
+                  <p>${content}</p>
+                </body>
+              </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+          }
+      } else {
+          let fileContent = content;
+          let mimeType = 'text/plain';
+          
+          if (format === 'html') {
+              fileContent = `<html><body><h1>${title}</h1><pre>${content}</pre></body></html>`;
+              mimeType = 'text/html';
+          }
+          
+          const blob = new Blob([fileContent], { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${safeTitle}.${format}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      }
+      setShowExport(false);
   };
 
   return (
@@ -205,7 +231,7 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
                  </button>
                  
                  {showTemplates && (
-                     <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-48 py-1 z-30">
+                     <div className="absolute top-full right-20 mt-2 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-48 py-1 z-30">
                          {TEMPLATES.map(t => (
                              <button 
                                 key={t.name}
@@ -218,13 +244,24 @@ const SmartEditor: React.FC<SmartEditorProps> = ({ workflowData, clearWorkflowDa
                      </div>
                  )}
 
-                 <button 
-                    onClick={handlePrint}
-                    className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                    title="Export PDF / Print"
-                 >
-                    <Icons.Printer />
-                 </button>
+                 <div className="relative">
+                     <button 
+                        onClick={() => setShowExport(!showExport)}
+                        className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                        title="Export"
+                     >
+                        <Icons.Download />
+                     </button>
+                     {showExport && (
+                         <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-40 py-1 z-30">
+                             <button onClick={() => handleExportFile('pdf')} className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">PDF / Print</button>
+                             <button onClick={() => handleExportFile('md')} className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Markdown</button>
+                             <button onClick={() => handleExportFile('html')} className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">HTML</button>
+                             <button onClick={() => handleExportFile('txt')} className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Plain Text</button>
+                         </div>
+                     )}
+                 </div>
+
                  <button 
                     onClick={handleSave}
                     className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors shadow-sm"

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -31,24 +32,37 @@ import Automator from './components/Automator';
 import Prospector from './components/Prospector';
 import HiringManager from './components/HiringManager';
 import Financials from './components/Financials';
+import EmailMarketing from './components/EmailMarketing';
+import StrategyHub from './components/StrategyHub';
+import SocialMediaManager from './components/SocialMediaManager';
+import TrendAnalyzer from './components/TrendAnalyzer';
+import TeamHub from './components/TeamHub';
+import AnalyticsDash from './components/AnalyticsDash';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { AppTool, ToolDefinition, Task } from './types';
 import { Icons } from './constants';
 import { ToastProvider, useToast } from './components/ToastContainer';
-import { getTheme, Theme, getActiveWorkspaceId } from './services/settingsService';
+import { getTheme, Theme, getActiveWorkspaceId, hasValidKey } from './services/settingsService';
 import { getTasks, saveTask } from './services/supabaseService';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 
 const AppContent: React.FC = () => {
-  const [currentTool, setCurrentTool] = useState<AppTool>(AppTool.MISSION_CONTROL);
-  const [selectedToolDef, setSelectedToolDef] = useState<ToolDefinition | null>(null);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { currentTool, selectedToolDef, setMobileOpen, setCommandPaletteOpen, navigate } = useNavigation();
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [workflowData, setWorkflowData] = useState<string | null>(null);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [workspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
+  const [showKeyModal, setShowKeyModal] = useState(false);
   
   // Tasks managed centrally but fetched from service
   const [tasks, setTasks] = useState<Task[]>([]);
   const toast = useToast();
+
+  useEffect(() => {
+      // Check for API Key
+      if (!hasValidKey()) {
+          setShowKeyModal(true);
+      }
+  }, []);
 
   const refreshTasks = async () => {
       const t = await getTasks();
@@ -99,21 +113,20 @@ const AppContent: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
             e.preventDefault();
-            setIsCommandPaletteOpen(prev => !prev);
+            setCommandPaletteOpen(true);
         }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [setCommandPaletteOpen]);
 
   const handleSelectTool = (tool: ToolDefinition) => {
-    setSelectedToolDef(tool);
-    setCurrentTool(AppTool.UNIVERSAL_TOOL);
+    navigate(AppTool.UNIVERSAL_TOOL, tool);
   };
 
   const handleWorkflowSend = (targetTool: AppTool, data: string) => {
     setWorkflowData(data);
-    setCurrentTool(targetTool);
+    navigate(targetTool);
   };
 
   const clearWorkflowData = () => {
@@ -133,13 +146,9 @@ const AppContent: React.FC = () => {
       toast.show("Task added to Projects!", "success");
   };
 
-  const handleNavigate = (tool: AppTool, def?: ToolDefinition) => {
-      if (tool === AppTool.UNIVERSAL_TOOL && def) {
-          handleSelectTool(def);
-      } else {
-          setCurrentTool(tool);
-      }
-  };
+  const handleBackToMissionControl = () => {
+    navigate(AppTool.MISSION_CONTROL);
+  }
 
   // Force re-render of tools when workspace changes by using key
   const renderContent = () => {
@@ -148,7 +157,7 @@ const AppContent: React.FC = () => {
       case AppTool.MISSION_CONTROL:
         return <MissionControl key={key} />;
       case AppTool.DASHBOARD:
-        return <Dashboard key={key} setTool={setCurrentTool} />;
+        return <Dashboard key={key} setTool={navigate} />;
       case AppTool.ADVISOR:
         return <BusinessAdvisor key={key} onWorkflowSend={handleWorkflowSend} onAddTask={handleAddTask} />;
       case AppTool.PROJECTS:
@@ -185,11 +194,23 @@ const AppContent: React.FC = () => {
         return <Automator key={key} />;
       case AppTool.PROSPECTOR:
         return <Prospector key={key} />;
+      case AppTool.EMAIL_MARKETING:
+        return <EmailMarketing key={key} />;
+      case AppTool.STRATEGY_HUB:
+        return <StrategyHub key={key} />;
+      case AppTool.SOCIAL_MEDIA:
+        return <SocialMediaManager key={key} />;
+      case AppTool.TRENDS:
+        return <TrendAnalyzer key={key} />;
+      case AppTool.TEAM:
+        return <TeamHub key={key} />;
+      case AppTool.ANALYTICS_DASH:
+        return <AnalyticsDash key={key} />;
       case AppTool.LIBRARY:
         return <ToolLibrary onSelectTool={handleSelectTool} />;
       case AppTool.UNIVERSAL_TOOL:
         return selectedToolDef 
-          ? <UniversalTool key={key} tool={selectedToolDef} onBack={() => setCurrentTool(AppTool.LIBRARY)} />
+          ? <UniversalTool key={key} tool={selectedToolDef} onBack={() => navigate(AppTool.LIBRARY)} />
           : <ToolLibrary onSelectTool={handleSelectTool} />;
       case AppTool.CONTENT:
         return <ContentGenerator key={key} onWorkflowSend={handleWorkflowSend} workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
@@ -204,30 +225,15 @@ const AppContent: React.FC = () => {
       case AppTool.SETTINGS:
         return <SettingsView onThemeChange={setTheme} />;
       default:
-        return <Dashboard key={key} setTool={setCurrentTool} />;
+        return <Dashboard key={key} setTool={navigate} />;
     }
   };
 
-  const handleBackToMissionControl = () => {
-    setCurrentTool(AppTool.MISSION_CONTROL);
-  }
-
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans">
-      <Sidebar 
-        currentTool={currentTool} 
-        setTool={setCurrentTool} 
-        isMobileOpen={isMobileOpen}
-        setIsMobileOpen={setIsMobileOpen}
-        onOpenSearch={() => setIsCommandPaletteOpen(true)}
-      />
-      
-      <CommandPalette 
-        isOpen={isCommandPaletteOpen} 
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onNavigate={handleNavigate}
-        onAddTask={handleAddTask}
-      />
+      <Sidebar />
+      <CommandPalette onAddTask={handleAddTask} />
+      {showKeyModal && <ApiKeyModal onConnected={() => setShowKeyModal(false)} />}
 
       <main className="flex-1 flex flex-col overflow-hidden relative md:ml-72">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between md:hidden bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-30">
@@ -241,10 +247,10 @@ const AppContent: React.FC = () => {
                     </div>
                     <h1 className="text-base font-bold text-slate-800 dark:text-white">Byete</h1>
                 </button>
-                <button onClick={() => setIsCommandPaletteOpen(true)} className="p-2 text-slate-500"><Icons.Search /></button>
+                <button onClick={() => setCommandPaletteOpen(true)} className="p-2 text-slate-500"><Icons.Search /></button>
             </div>
             <button 
-                onClick={() => setIsMobileOpen(true)}
+                onClick={() => setMobileOpen(true)}
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
             >
                 <Icons.Menu />
@@ -261,7 +267,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ToastProvider>
-      <AppContent />
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
     </ToastProvider>
   );
 };

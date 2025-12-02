@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { performMarketResearch } from '../services/geminiService';
+import { performMarketResearch, generateSWOTAnalysis } from '../services/geminiService';
 import { saveItem, getSupabaseConfig } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt } from '../services/settingsService';
-import { GroundingChunk, AppTool } from '../types';
+import { GroundingChunk, AppTool, SWOTAnalysis } from '../types';
 import { Icons } from '../constants';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useToast } from './ToastContainer';
 
 interface MarketResearchProps {
   isWidget?: boolean;
@@ -18,9 +19,12 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
   const [region, setRegion] = useState('Global');
   const [industry, setIndustry] = useState('');
   const [result, setResult] = useState<{ text: string; sources: GroundingChunk[] } | null>(null);
+  const [swot, setSwot] = useState<SWOTAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
+  const [swotLoading, setSwotLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
+  const toast = useToast();
 
   const handleResearchAI = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +32,7 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
     
     setLoading(true);
     setResult(null);
+    setSwot(null);
     try {
       const profile = getProfile();
       let context = formatProfileForPrompt(profile);
@@ -48,16 +53,35 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
       setResult({ text: data.text, sources: data.groundingChunks });
     } catch (err) {
       console.error(err);
+      toast.show("Research failed.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGenerateSWOT = async () => {
+      if(!query) return;
+      setSwotLoading(true);
+      try {
+          const result = await generateSWOTAnalysis(query, `Context: ${region}, ${industry}`);
+          setSwot(result);
+          toast.show("SWOT Analysis generated!", "success");
+      } catch(e) {
+          toast.show("Failed to generate SWOT.", "error");
+      } finally {
+          setSwotLoading(false);
+      }
+  };
+
   const handleSave = async () => {
-    // ... (Implementation similar to other components)
-    if(!result) return;
+    if(!result && !swot) return;
     setSaving(true);
-    await saveItem('Research', query, result.text);
+    let contentToSave = result ? result.text : '';
+    if (swot) {
+        contentToSave += `\n\n## SWOT Analysis\n**Strengths:** ${swot.strengths.join(', ')}\n**Weaknesses:** ${swot.weaknesses.join(', ')}\n**Opportunities:** ${swot.opportunities.join(', ')}\n**Threats:** ${swot.threats.join(', ')}`;
+    }
+    await saveItem('Research', query, contentToSave);
+    toast.show("Saved to database.", "success");
     setSaving(false);
   };
 
@@ -159,14 +183,23 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
                 </div>
             )}
 
-            {result && (
+            {(result || swot) && (
                 <div className={`flex-1 overflow-y-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 animate-fade-in ${isWidget ? 'p-4' : 'p-8'}`}>
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-2">
                         <Icons.Chart /> Executive Summary ({analysisMode})
                     </h4>
                     <div className="flex gap-2 items-center">
-                        {onWorkflowSend && (
+                        {!isWidget && !swot && (
+                            <button 
+                                onClick={handleGenerateSWOT}
+                                disabled={swotLoading}
+                                className="flex items-center gap-1 text-purple-600 hover:text-purple-700 text-xs font-bold bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                {swotLoading ? 'Generating...' : <><Icons.Sparkles /> Generate SWOT</>}
+                            </button>
+                        )}
+                        {onWorkflowSend && result && (
                             <div className="relative">
                                 <button
                                     onClick={() => setShowWorkflowMenu(!showWorkflowMenu)}
@@ -194,11 +227,34 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
                     </div>
                 </div>
                 
-                <div className={`${isWidget ? 'mb-4 text-xs' : 'mb-8'}`}>
-                    <MarkdownRenderer content={result.text} />
-                </div>
+                {swot && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800">
+                            <h5 className="font-bold text-emerald-800 dark:text-emerald-400 mb-2 uppercase text-xs">Strengths</h5>
+                            <ul className="text-sm space-y-1 list-disc pl-4 text-emerald-700 dark:text-emerald-300">{swot.strengths.map((s,i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
+                            <h5 className="font-bold text-red-800 dark:text-red-400 mb-2 uppercase text-xs">Weaknesses</h5>
+                            <ul className="text-sm space-y-1 list-disc pl-4 text-red-700 dark:text-red-300">{swot.weaknesses.map((s,i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+                            <h5 className="font-bold text-blue-800 dark:text-blue-400 mb-2 uppercase text-xs">Opportunities</h5>
+                            <ul className="text-sm space-y-1 list-disc pl-4 text-blue-700 dark:text-blue-300">{swot.opportunities.map((s,i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-100 dark:border-amber-800">
+                            <h5 className="font-bold text-amber-800 dark:text-amber-400 mb-2 uppercase text-xs">Threats</h5>
+                            <ul className="text-sm space-y-1 list-disc pl-4 text-amber-700 dark:text-amber-300">{swot.threats.map((s,i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                    </div>
+                )}
 
-                {result.sources && result.sources.length > 0 && (
+                {result && (
+                    <div className={`${isWidget ? 'mb-4 text-xs' : 'mb-8'}`}>
+                        <MarkdownRenderer content={result.text} />
+                    </div>
+                )}
+
+                {result && result.sources && result.sources.length > 0 && (
                     <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-6 border border-slate-100 dark:border-slate-700">
                     <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <Icons.Globe /> Cited Sources
@@ -233,7 +289,7 @@ const MarketResearch: React.FC<MarketResearchProps> = ({ isWidget = false, onWor
                 </div>
             )}
             
-            {!result && !loading && isWidget && (
+            {!result && !swot && !loading && isWidget && (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                     <p className="text-xs font-medium">Enter a topic to start research</p>
                 </div>

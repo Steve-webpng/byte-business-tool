@@ -1,495 +1,433 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Contact, ContactStatus, Deal, DealStage, Comment } from '../types';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
 import { getContacts, saveContact, updateContact, deleteContact, testConnection, getDeals, saveDeal, updateDeal, deleteDeal, getComments, addComment } from '../services/supabaseService';
-import { generateContactInsights, discoverLeads, suggestNextDealAction, generateFollowUpEmail, performMarketResearch } from '../services/geminiService';
-import { getProfile, formatProfileForPrompt } from '../services/settingsService';
-import MarkdownRenderer from './MarkdownRenderer';
-import { format, parseISO, addDays, isPast, isToday } from 'date-fns';
-
-const DEAL_STAGES: DealStage[] = ['Lead In', 'Contact Made', 'Proposal Sent', 'Negotiation', 'Won', 'Lost'];
+import { generateContactInsights, discoverLeads, suggestNextDealAction, enrichContactData, generateFollowUpEmail } from '../services/geminiService';
 
 const CRM: React.FC = () => {
+    const [view, setView] = useState<'contacts' | 'deals'>('contacts');
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [deals, setDeals] = useState<Deal[]>([]);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<'list' | 'pipeline' | 'reminders' | 'form' | 'detail'>('list');
     const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-    const [isNew, setIsNew] = useState(false);
-    const [formState, setFormState] = useState<Contact>({ name: '', email: '', company: '', role: '', status: 'Lead', notes: '', last_contacted: '', follow_up_date: '' });
-    const [tableMissing, setTableMissing] = useState<'none' | 'contacts' | 'deals'>('none');
-    const toast = useToast();
-    
-    // AI Features state
+    const [isEditing, setIsEditing] = useState(false);
     const [aiInsight, setAiInsight] = useState('');
-    const [aiLoading, setAiLoading] = useState(false);
-    const [leadQuery, setLeadQuery] = useState('');
-    const [discoveredLeads, setDiscoveredLeads] = useState<any[]>([]);
-    const [generatedEmail, setGeneratedEmail] = useState<{text: string, contactId: number} | null>(null);
+    const [insightLoading, setInsightLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [tableMissing, setTableMissing] = useState(false);
+    const toast = useToast();
 
-    const [dealForm, setDealForm] = useState<{show: boolean, contactId?: number}>({show: false});
-    const [newDeal, setNewDeal] = useState<Partial<Deal>>({name: '', value: 0, stage: 'Lead In', notes: ''});
-    
-    // Dictation
-    const [isDictating, setIsDictating] = useState(false);
-    const recognitionRef = useRef<any>(null);
+    // Deal specific state
+    const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+    const [isEditingDeal, setIsEditingDeal] = useState(false);
 
-    // Comments State
+    // Comments
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
-
-    const refreshData = async () => {
-        setLoading(true);
-        const hasContactsTable = await testConnection('contacts');
-        const hasDealsTable = await testConnection('deals');
-
-        if (!hasContactsTable) { setTableMissing('contacts'); setLoading(false); return; }
-        if (!hasDealsTable) { setTableMissing('deals'); setLoading(false); return; }
-
-        const contactsData = await getContacts();
-        const dealsData = await getDeals();
-        setContacts(contactsData);
-        setDeals(dealsData);
-        setLoading(false);
-    };
-
-    const loadComments = async (contactId: number) => {
-        const cmts = await getComments('contact', contactId);
-        setComments(cmts);
-    };
 
     useEffect(() => {
         refreshData();
     }, []);
 
-    const handleSelectContact = async (contact: Contact) => {
-        setSelectedContact(contact);
-        setView('detail');
-        setAiInsight('');
-        if(contact.id) await loadComments(contact.id);
-    };
+    const refreshData = async () => {
+        setLoading(true);
+        // Check DB connection first
+        const hasTable = await testConnection('contacts');
+        if (!hasTable) {
+            setTableMissing(true);
+            setLoading(false);
+            return;
+        }
 
-    const handleAddComment = async () => {
-        if(!selectedContact?.id || !newComment.trim()) return;
-        await addComment('contact', selectedContact.id, newComment);
-        setNewComment('');
-        await loadComments(selectedContact.id);
-    };
-
-    const handleNewContact = () => {
-        setIsNew(true);
-        setFormState({ name: '', email: '', company: '', role: '', status: 'Lead', notes: '', last_contacted: '', follow_up_date: '' });
-        setView('form');
-    };
-
-    const handleEditContact = (contact: Contact) => {
-        setIsNew(false);
-        setFormState(contact);
-        setView('form');
+        const [cData, dData] = await Promise.all([getContacts(), getDeals()]);
+        setContacts(cData);
+        setDeals(dData);
+        setLoading(false);
     };
 
     const handleSaveContact = async (e: React.FormEvent) => {
         e.preventDefault();
-        const res = isNew ? await saveContact(formState) : await updateContact(formState);
-        if (res) {
-            await refreshData();
-            toast.show(`Contact ${isNew ? 'created' : 'updated'}!`, 'success');
-            setView('list');
-        } else {
-            toast.show("Failed to save contact.", 'error');
+        if (!selectedContact) return;
+        
+        // Auto-assign random Lead Score if new
+        if (selectedContact.lead_score === undefined) {
+            selectedContact.lead_score = Math.floor(Math.random() * 40) + 10; // Default low score
         }
+
+        if (selectedContact.id) {
+            await updateContact(selectedContact);
+            toast.show("Contact updated", "success");
+        } else {
+            await saveContact(selectedContact);
+            toast.show("Contact created", "success");
+        }
+        setIsEditing(false);
+        setSelectedContact(null);
+        refreshData();
     };
 
     const handleDeleteContact = async (id: number) => {
-        if (window.confirm("Are you sure? This may also affect linked deals.")) {
-            const success = await deleteContact(id);
-            if (success) {
-                await refreshData();
-                toast.show("Contact deleted.", 'success');
-                setView('list');
-            } else {
-                toast.show("Failed to delete contact.", 'error');
-            }
+        if (confirm("Delete this contact?")) {
+            await deleteContact(id);
+            refreshData();
+            setSelectedContact(null);
+            toast.show("Contact deleted", "info");
         }
     };
 
-    const handleSaveDeal = async () => {
-        if(!newDeal.name || !newDeal.value || !dealForm.contactId) return;
-        const dealToSave: Omit<Deal, 'id' | 'created_at'> = {
-            name: newDeal.name,
-            value: newDeal.value,
-            contact_id: dealForm.contactId,
-            stage: 'Lead In',
-            notes: newDeal.notes || ''
-        };
-        const res = await saveDeal(dealToSave);
-        if (res) {
-            await refreshData();
-            toast.show("Deal created!", 'success');
-            setDealForm({show: false});
-            setView('pipeline');
-        } else {
-            toast.show("Failed to create deal.", 'error');
-        }
-    };
-
-    // ... (AI handlers unchanged) ...
-    const handleGenerateInsights = async (contact: Contact) => {
-        setAiLoading(true);
-        setAiInsight('');
+    const handleGenerateInsight = async () => {
+        if (!selectedContact) return;
+        setInsightLoading(true);
         try {
-            const insight = await generateContactInsights(contact);
+            const insight = await generateContactInsights(selectedContact);
             setAiInsight(insight);
         } catch (e) {
-            toast.show("Failed to get AI insights.", "error");
+            toast.show("Failed to generate insight", "error");
         } finally {
-            setAiLoading(false);
+            setInsightLoading(false);
         }
     };
 
-    const handleNewsIntel = async (contact: Contact) => {
-        if (!contact.company) {
-            toast.show("No company name to research.", "error");
-            return;
-        }
-        setAiLoading(true);
-        setAiInsight('');
+    const handleEnrich = async () => {
+        if (!selectedContact) return;
+        setInsightLoading(true);
         try {
-            const result = await performMarketResearch(`Latest business news about ${contact.company}`, undefined, 'general');
-            setAiInsight(`### 📰 Latest News for ${contact.company}\n\n${result.text}`);
-        } catch (e) {
-            toast.show("Failed to find news.", "error");
+            const enriched = await enrichContactData(selectedContact);
+            setAiInsight(enriched);
+            // Auto update notes
+            const updated = { ...selectedContact, notes: (selectedContact.notes || '') + '\n\nAI Enrichment:\n' + enriched, lead_score: Math.min(100, (selectedContact.lead_score || 50) + 20) };
+            await updateContact(updated);
+            setSelectedContact(updated);
+            toast.show("Contact enriched & score updated!", "success");
+        } catch(e) {
+            toast.show("Enrichment failed", "error");
         } finally {
-            setAiLoading(false);
+            setInsightLoading(false);
         }
+    };
+
+    // Deal Logic
+    const handleSaveDeal = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(!selectedDeal) return;
+        if(selectedDeal.id) await updateDeal(selectedDeal);
+        else await saveDeal(selectedDeal);
+        
+        setIsEditingDeal(false);
+        setSelectedDeal(null);
+        refreshData();
+        toast.show("Deal saved", "success");
+    };
+
+    const getPipelineVal = () => deals.reduce((acc, d) => acc + Number(d.value), 0);
+
+    const filteredContacts = contacts.filter(c => 
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        c.company.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const getLeadScoreColor = (score: number) => {
+        if (score >= 80) return 'bg-emerald-100 text-emerald-700';
+        if (score >= 50) return 'bg-blue-100 text-blue-700';
+        return 'bg-slate-100 text-slate-600';
+    };
+
+    const getProbabilityColor = (prob: number) => {
+        if (prob >= 80) return 'text-emerald-600 font-bold';
+        if (prob >= 50) return 'text-blue-600 font-semibold';
+        return 'text-slate-500';
+    };
+
+    if (tableMissing) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4"><Icons.Database /></div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">Database Setup Required</h3>
+                <p className="text-slate-500 max-w-md mt-2">Please go to <strong>Settings -> Data Management</strong> and run the setup script to create the CRM tables.</p>
+            </div>
+        );
     }
 
-    const handleSuggestNextStep = async (deal: Deal) => {
-        const contact = contacts.find(c => c.id === deal.contact_id);
-        if (!contact) return;
-        setAiLoading(true);
-        try {
-            const suggestion = await suggestNextDealAction(deal, contact);
-            toast.show(suggestion, 'info');
-        } catch (e) {
-            toast.show("Failed to get suggestion.", "error");
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
-    const handleDraftFollowUp = async (contact: Contact) => {
-        setAiLoading(true);
-        try {
-            const profile = getProfile();
-            const context = formatProfileForPrompt(profile);
-            const emailBody = await generateFollowUpEmail(contact, context);
-            setGeneratedEmail({ text: emailBody, contactId: contact.id! });
-        } catch (e) {
-            toast.show("Failed to generate email.", "error");
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
-    const toggleDictation = () => {
-        if (isDictating) {
-            if (recognitionRef.current) recognitionRef.current.stop();
-            setIsDictating(false);
-        } else {
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                toast.show("Speech recognition not supported in this browser.", "error");
-                return;
-            }
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.onresult = (event: any) => {
-                const transcript = event.results[0][0].transcript;
-                setFormState(prev => ({ ...prev, notes: (prev.notes ? prev.notes + '\n' : '') + transcript }));
-                setIsDictating(false);
-            };
-            recognition.start();
-            setIsDictating(true);
-            recognitionRef.current = recognition;
-        }
-    };
-
-    const getFollowUpStatus = (dateStr?: string) => {
-        if (!dateStr) return 'none';
-        const date = parseISO(dateStr);
-        if (isToday(date)) return 'today';
-        if (isPast(date)) return 'overdue';
-        return 'upcoming';
-    };
-
-    // ... (Existing render functions for header, colors, etc.) ...
-    const renderHeader = () => (
-        <div className="mb-6 flex flex-col sm:flex-row justify-between items-end gap-4">
-            <div>
-                <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200">CRM</h2>
-                <p className="text-slate-500 dark:text-slate-400">Manage contacts, pipeline, and follow-ups.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
-                    <button onClick={() => setView('list')} className={`px-3 py-2 text-sm font-bold rounded-md ${view === 'list' ? 'bg-white dark:bg-slate-700 shadow' : ''}`}>Contacts</button>
-                    <button onClick={() => setView('pipeline')} className={`px-3 py-2 text-sm font-bold rounded-md ${view === 'pipeline' ? 'bg-white dark:bg-slate-700 shadow' : ''}`}>Pipeline</button>
-                    <button onClick={() => setView('reminders')} className={`px-3 py-2 text-sm font-bold rounded-md flex items-center gap-1 ${view === 'reminders' ? 'bg-white dark:bg-slate-700 shadow' : ''}`}>
-                        <Icons.Clock /> Reminders
+    return (
+        <div className="h-full flex flex-col max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-6 flex justify-between items-end">
+                <div>
+                    <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <Icons.Identification /> Intelligent CRM
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400">Manage relationships and track your pipeline.</p>
+                </div>
+                <div className="flex gap-2">
+                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex text-sm font-bold">
+                        <button onClick={() => setView('contacts')} className={`px-3 py-1.5 rounded-md transition-all ${view === 'contacts' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>Contacts</button>
+                        <button onClick={() => setView('deals')} className={`px-3 py-1.5 rounded-md transition-all ${view === 'deals' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>Pipeline</button>
+                    </div>
+                    <button 
+                        onClick={() => {
+                            if (view === 'contacts') {
+                                setSelectedContact({ name: '', email: '', company: '', role: '', status: 'Lead', notes: '', lead_score: 10 });
+                                setIsEditing(true);
+                            } else {
+                                setSelectedDeal({ name: '', value: 0, contact_id: 0, stage: 'Lead In', notes: '', probability: 20 });
+                                setIsEditingDeal(true);
+                            }
+                        }}
+                        className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                    >
+                        <Icons.Plus /> Add {view === 'contacts' ? 'Contact' : 'Deal'}
                     </button>
                 </div>
-                <button onClick={handleNewContact} className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
-                    <Icons.Plus /> New
-                </button>
             </div>
-        </div>
-    );
 
-    const stageColors: Record<DealStage, string> = {
-        'Lead In': 'bg-slate-200 dark:bg-slate-700',
-        'Contact Made': 'bg-blue-200 dark:bg-blue-800',
-        'Proposal Sent': 'bg-yellow-200 dark:bg-yellow-800',
-        'Negotiation': 'bg-orange-200 dark:bg-orange-800',
-        'Won': 'bg-emerald-200 dark:bg-emerald-800',
-        'Lost': 'bg-red-200 dark:bg-red-800',
-    };
+            {/* Content */}
+            <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+                
+                {/* CONTACTS VIEW */}
+                {view === 'contacts' && (
+                    <>
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex gap-4">
+                            <div className="relative flex-1">
+                                <div className="absolute left-3 top-2.5 text-slate-400"><Icons.Search /></div>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search contacts..." 
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-xs uppercase sticky top-0 z-10">
+                                    <tr>
+                                        <th className="p-4 font-bold">Name</th>
+                                        <th className="p-4 font-bold">Role & Company</th>
+                                        <th className="p-4 font-bold">Status</th>
+                                        <th className="p-4 font-bold">Lead Score</th>
+                                        <th className="p-4 font-bold text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                    {filteredContacts.map(c => (
+                                        <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
+                                            <td className="p-4">
+                                                <div className="font-bold text-slate-800 dark:text-slate-200">{c.name}</div>
+                                                <div className="text-xs text-slate-400">{c.email}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="text-sm text-slate-700 dark:text-slate-300">{c.role}</div>
+                                                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold">{c.company}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${c.status === 'Customer' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                    {c.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div className={`h-full ${c.lead_score && c.lead_score > 70 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{width: `${c.lead_score || 0}%`}}></div>
+                                                    </div>
+                                                    <span className={`text-xs font-bold ${c.lead_score && c.lead_score > 70 ? 'text-emerald-600' : 'text-slate-500'}`}>{c.lead_score || 0}</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <button onClick={() => { setSelectedContact(c); setIsEditing(true); }} className="text-slate-400 hover:text-blue-600 p-2"><Icons.Pen /></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
 
-    if (loading) return <div>Loading...</div>;
-
-    // --- LIST VIEW ---
-    if (view === 'list') return (
-        <div className="h-full flex flex-col max-w-7xl mx-auto">
-            {renderHeader()}
-            <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-                 <table className="w-full text-left">
-                    <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                        <tr>
-                            <th className="p-4 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Name</th>
-                            <th className="p-4 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Company</th>
-                            <th className="p-4 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Status</th>
-                            <th className="p-4 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Follow Up</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {contacts.map(contact => {
-                            const status = getFollowUpStatus(contact.follow_up_date);
+                {/* DEALS VIEW */}
+                {view === 'deals' && (
+                    <div className="flex-1 overflow-x-auto p-4 flex gap-4 min-w-0">
+                        {['Lead In', 'Contact Made', 'Proposal Sent', 'Negotiation', 'Won'].map(stage => {
+                            const stageDeals = deals.filter(d => d.stage === stage);
+                            const total = stageDeals.reduce((acc, d) => acc + Number(d.value), 0);
                             return (
-                                <tr key={contact.id} onClick={() => handleSelectContact(contact)} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer group">
-                                    <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{contact.name}</td>
-                                    <td className="p-4 text-slate-600 dark:text-slate-300">{contact.company}</td>
-                                    <td className="p-4"><span className="text-xs font-bold bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 px-2 py-1 rounded-full">{contact.status}</span></td>
-                                    <td className="p-4">
-                                        {contact.follow_up_date && (
-                                            <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit
-                                                ${status === 'overdue' ? 'bg-red-100 text-red-600' : status === 'today' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                {status === 'overdue' && <Icons.X />}
-                                                {new Date(contact.follow_up_date).toLocaleDateString()}
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
+                                <div key={stage} className="w-72 flex-shrink-0 flex flex-col bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 h-full">
+                                    <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-t-xl">
+                                        <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 uppercase flex justify-between">
+                                            {stage} 
+                                            <span className="text-slate-400 text-xs">{stageDeals.length}</span>
+                                        </h4>
+                                        <p className="text-xs font-bold text-emerald-600 mt-1">${total.toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                        {stageDeals.map(deal => {
+                                            const contact = contacts.find(c => c.id === deal.contact_id);
+                                            return (
+                                                <div key={deal.id} onClick={() => { setSelectedDeal(deal); setIsEditingDeal(true); }} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all group">
+                                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">{deal.name}</div>
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">${Number(deal.value).toLocaleString()}</span>
+                                                        {deal.probability && (
+                                                            <span className={`text-[10px] ${getProbabilityColor(deal.probability)}`}>{deal.probability}% Prob.</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 border-t border-slate-100 dark:border-slate-700 pt-2 mt-2 flex items-center gap-1">
+                                                        <Icons.User /> {contact?.name || 'Unknown'}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
                             )
                         })}
-                    </tbody>
-                 </table>
+                    </div>
+                )}
             </div>
-        </div>
-    );
 
-    // --- PIPELINE & REMINDERS VIEWS (Omitted for brevity but assumed present) ---
-    if (view === 'pipeline') {
-        // ... (Same as before)
-        return (
-        <div className="h-full flex flex-col max-w-full mx-auto">
-            {renderHeader()}
-            <div className="flex-1 min-h-0 flex gap-6 overflow-x-auto pb-4">
-                {DEAL_STAGES.map(stage => {
-                    const stageDeals = deals.filter(d => d.stage === stage);
-                    const totalValue = stageDeals.reduce((sum, d) => sum + d.value, 0);
-                    return (
-                        <div key={stage} className="w-80 flex-shrink-0 flex flex-col bg-slate-50 dark:bg-slate-800/50 rounded-xl overflow-hidden h-full border border-slate-200 dark:border-slate-700">
-                            <div className="p-4 font-bold text-sm border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${stageColors[stage]}`}></div>
-                                    <span className="text-slate-700 dark:text-slate-300 uppercase tracking-wide">{stage}</span>
-                                </div>
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">${totalValue.toLocaleString()}</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                                {stageDeals.map(deal => {
-                                    const contact = contacts.find(c => c.id === deal.contact_id);
-                                    return (
-                                        <div key={deal.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                                            <div className="flex justify-between items-start">
-                                                <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{deal.name}</p>
-                                                <button onClick={() => handleSuggestNextStep(deal)} disabled={aiLoading} className="text-purple-500 hover:bg-purple-100 p-1 rounded-full"><Icons.Sparkles /></button>
-                                            </div>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{contact?.name || 'No contact'}</p>
-                                            <p className="text-lg font-bold text-emerald-600 mt-2">${deal.value.toLocaleString()}</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+            {/* EDIT CONTACT MODAL */}
+            {isEditing && selectedContact && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+                                {selectedContact.id ? 'Edit Contact' : 'New Contact'}
+                            </h3>
+                            <button onClick={() => { setIsEditing(false); setSelectedContact(null); }} className="text-slate-400 hover:text-slate-600"><Icons.X /></button>
                         </div>
-                    );
-                })}
-            </div>
-        </div>
-        );
-    }
-
-    if (view === 'reminders') {
-        const overdue = contacts.filter(c => getFollowUpStatus(c.follow_up_date) === 'overdue');
-        const today = contacts.filter(c => getFollowUpStatus(c.follow_up_date) === 'today');
-        const upcoming = contacts.filter(c => getFollowUpStatus(c.follow_up_date) === 'upcoming').sort((a, b) => new Date(a.follow_up_date!).getTime() - new Date(b.follow_up_date!).getTime());
-
-        return (
-            <div className="h-full flex flex-col max-w-7xl mx-auto">
-                {renderHeader()}
-                <div className="flex-1 overflow-y-auto space-y-6">
-                    {(overdue.length > 0 || today.length > 0) && (
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide">Needs Attention</h3>
-                            {[...overdue, ...today].map(c => (
-                                <div key={c.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-l-4 border-slate-200 dark:border-slate-700 border-l-red-500 shadow-sm flex justify-between items-center">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-lg text-slate-800 dark:text-slate-200">{c.name}</span>
-                                            <span className="text-xs text-slate-500">{c.company}</span>
+                        
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                {/* Form Side */}
+                                <div className="flex-1 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name</label>
+                                            <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.name} onChange={e => setSelectedContact({...selectedContact, name: e.target.value})} />
                                         </div>
-                                        <p className="text-xs text-red-500 font-bold flex items-center gap-1">
-                                            <Icons.Clock /> Follow Up: {new Date(c.follow_up_date!).toLocaleDateString()}
-                                        </p>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Company</label>
+                                            <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.company} onChange={e => setSelectedContact({...selectedContact, company: e.target.value})} />
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleSelectContact(c)} className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200">View</button>
-                                        <button onClick={() => handleDraftFollowUp(c)} className="text-xs font-bold text-white bg-blue-600 px-3 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-1">
-                                            {aiLoading ? 'Drafting...' : <><Icons.Sparkles /> AI Draft Email</>}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role</label>
+                                            <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.role} onChange={e => setSelectedContact({...selectedContact, role: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                                            <select className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.status} onChange={e => setSelectedContact({...selectedContact, status: e.target.value as any})}>
+                                                <option>Lead</option><option>Contacted</option><option>Customer</option><option>Archived</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex justify-between">
+                                            <span>Lead Score (0-100)</span>
+                                            <span className="text-blue-600">{selectedContact.lead_score || 0}</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="0" max="100" 
+                                            className="w-full accent-blue-600"
+                                            value={selectedContact.lead_score || 0}
+                                            onChange={e => setSelectedContact({...selectedContact, lead_score: parseInt(e.target.value)})}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notes</label>
+                                        <textarea className="w-full p-2 border rounded h-32 bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.notes} onChange={e => setSelectedContact({...selectedContact, notes: e.target.value})} />
+                                    </div>
+                                    
+                                    <div className="flex gap-3 pt-4">
+                                        <button onClick={handleSaveContact} className="flex-1 bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">Save</button>
+                                        {selectedContact.id && <button onClick={() => handleDeleteContact(selectedContact.id!)} className="bg-red-50 text-red-600 font-bold px-4 rounded hover:bg-red-100">Delete</button>}
+                                    </div>
+                                </div>
+
+                                {/* AI Side */}
+                                <div className="md:w-1/3 bg-purple-50 dark:bg-slate-900/50 rounded-xl p-4 border border-purple-100 dark:border-slate-700">
+                                    <h4 className="font-bold text-purple-800 dark:text-purple-400 mb-4 flex items-center gap-2"><Icons.Sparkles /> AI Actions</h4>
+                                    
+                                    <div className="flex flex-col gap-2 mb-4">
+                                        <button onClick={handleEnrich} disabled={insightLoading} className="text-xs bg-white dark:bg-slate-800 border border-purple-200 dark:border-slate-600 p-2 rounded text-left hover:bg-purple-50 transition-colors">
+                                            <strong>Smart Enrich</strong><br/><span className="text-slate-500">Find details on web</span>
+                                        </button>
+                                        <button onClick={handleGenerateInsight} disabled={insightLoading} className="text-xs bg-white dark:bg-slate-800 border border-purple-200 dark:border-slate-600 p-2 rounded text-left hover:bg-purple-50 transition-colors">
+                                            <strong>Generate Strategy</strong><br/><span className="text-slate-500">How to close this deal</span>
                                         </button>
                                     </div>
+
+                                    <div className="bg-white dark:bg-slate-800 rounded p-3 text-xs text-slate-600 dark:text-slate-300 min-h-[100px] max-h-[300px] overflow-y-auto">
+                                        {insightLoading ? 'Thinking...' : aiInsight || <span className="italic text-slate-400">AI insights will appear here...</span>}
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                    {/* Upcoming... */}
-                </div>
-            </div>
-        );
-    }
-
-    if (view === 'form') return (
-        <div className="max-w-2xl mx-auto">
-            <button onClick={() => setView('list')} className="mb-4 text-slate-500">&larr; Back to list</button>
-            <h2 className="text-2xl font-bold mb-4 text-slate-800 dark:text-slate-200">{isNew ? 'New Contact' : 'Edit Contact'}</h2>
-            <form onSubmit={handleSaveContact} className="space-y-4 bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                 <div className="grid grid-cols-2 gap-4">
-                    <input name="name" value={formState.name} onChange={e => setFormState({...formState, name: e.target.value})} placeholder="Name" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" required/>
-                    <input name="email" value={formState.email} onChange={e => setFormState({...formState, email: e.target.value})} placeholder="Email" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" />
-                 </div>
-                 {/* ... (rest of form) ... */}
-                 <button type="submit" className="bg-blue-600 text-white font-bold p-3 rounded-lg w-full hover:bg-blue-700 transition-colors">Save Contact</button>
-            </form>
-        </div>
-    );
-
-    // --- DETAIL VIEW WITH COMMENTS ---
-    if (view === 'detail' && selectedContact) return (
-        <div className="h-full flex gap-6 max-w-7xl mx-auto">
-            {/* Left: Details */}
-            <div className="flex-1 overflow-y-auto">
-                <button onClick={() => setView('list')} className="mb-4 text-slate-500">&larr; Back to list</button>
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200">{selectedContact.name}</h2>
-                                <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full text-slate-600 dark:text-slate-300 font-bold">{selectedContact.status}</span>
-                            </div>
-                            <p className="text-slate-500 dark:text-slate-400 mt-1">{selectedContact.role} at {selectedContact.company}</p>
-                            <a href={`mailto:${selectedContact.email}`} className="text-blue-600 hover:underline mt-1 block">{selectedContact.email}</a>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => setDealForm({show: true, contactId: selectedContact.id})} className="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-emerald-700">New Deal</button>
-                            <button onClick={() => handleEditContact(selectedContact)} className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-4 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600">Edit</button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mt-6 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
-                        <div>
-                            <span className="text-xs text-slate-400 uppercase font-bold block">Last Interaction</span>
-                            <span className="text-sm font-medium">{selectedContact.last_contacted ? new Date(selectedContact.last_contacted).toLocaleDateString() : 'N/A'}</span>
-                        </div>
-                        <div>
-                            <span className="text-xs text-slate-400 uppercase font-bold block">Next Follow-up</span>
-                            <span className={`text-sm font-medium ${getFollowUpStatus(selectedContact.follow_up_date) === 'overdue' ? 'text-red-500' : ''}`}>
-                                {selectedContact.follow_up_date ? new Date(selectedContact.follow_up_date).toLocaleDateString() : 'None set'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="mt-6 border-t dark:border-slate-700 pt-6">
-                        <h3 className="font-bold text-sm uppercase text-slate-500 dark:text-slate-400 mb-2">Notes</h3>
-                        <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{selectedContact.notes || 'No notes for this contact.'}</p>
-                    </div>
-
-                    {/* AI Section */}
-                    <div className="mt-6 border-t dark:border-slate-700 pt-6">
-                        <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-2">
-                            <h3 className="font-bold text-sm uppercase text-slate-500 dark:text-slate-400">AI Assistant</h3>
-                            <div className="flex flex-wrap gap-2">
-                                <button onClick={() => handleDraftFollowUp(selectedContact)} disabled={aiLoading} className="bg-blue-50 text-blue-600 font-bold px-3 py-1.5 rounded-lg text-xs border border-blue-100 hover:bg-blue-100">
-                                    {aiLoading ? 'Thinking...' : 'Draft Email'}
-                                </button>
-                                <button onClick={() => handleGenerateInsights(selectedContact)} disabled={aiLoading} className="bg-purple-50 text-purple-700 font-bold px-3 py-1.5 rounded-lg text-xs border border-purple-100 hover:bg-purple-100">
-                                    Conversation Starters
-                                </button>
-                                <button onClick={() => handleNewsIntel(selectedContact)} disabled={aiLoading} className="bg-emerald-50 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs border border-emerald-100 hover:bg-emerald-100">
-                                    News Intel
-                                </button>
                             </div>
                         </div>
-                        {generatedEmail && generatedEmail.contactId === selectedContact.id && (
-                            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                                <h4 className="text-xs font-bold text-blue-600 mb-2">Draft Email</h4>
-                                <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{generatedEmail.text}</p>
-                                <button onClick={() => { navigator.clipboard.writeText(generatedEmail.text); toast.show("Copied!", "success"); }} className="mt-2 text-xs text-blue-600 font-bold hover:underline">Copy to Clipboard</button>
-                            </div>
-                        )}
-                        {aiInsight && <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg"><MarkdownRenderer content={aiInsight} /></div>}
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Right: Comments Feed */}
-            <div className="w-80 bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col hidden lg:flex">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-700 dark:text-slate-300">
-                    Activity & Comments
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {comments.length === 0 && <p className="text-center text-slate-400 text-xs italic">No activity yet.</p>}
-                    {comments.map(c => (
-                        <div key={c.id} className="flex gap-3">
-                            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
-                                {c.user?.avatar || 'U'}
-                            </div>
+            {/* EDIT DEAL MODAL */}
+            {isEditingDeal && selectedDeal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-6">
+                        <h3 className="text-xl font-bold mb-4 dark:text-white">{selectedDeal.id ? 'Edit Deal' : 'New Deal'}</h3>
+                        <form onSubmit={handleSaveDeal} className="space-y-4">
                             <div>
-                                <div className="flex items-baseline gap-2 mb-1">
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{c.user?.name || 'Unknown'}</span>
-                                    <span className="text-[10px] text-slate-400">{new Date(c.created_at).toLocaleDateString()}</span>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Deal Name</label>
+                                <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedDeal.name} onChange={e => setSelectedDeal({...selectedDeal, name: e.target.value})} required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Value ($)</label>
+                                    <input type="number" className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedDeal.value} onChange={e => setSelectedDeal({...selectedDeal, value: Number(e.target.value)})} required />
                                 </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-                                    {c.content}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Stage</label>
+                                    <select className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedDeal.stage} onChange={e => setSelectedDeal({...selectedDeal, stage: e.target.value as any})}>
+                                        <option>Lead In</option><option>Contact Made</option><option>Proposal Sent</option><option>Negotiation</option><option>Won</option><option>Lost</option>
+                                    </select>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                            
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex justify-between">
+                                    <span>Probability</span>
+                                    <span className={getProbabilityColor(selectedDeal.probability || 0)}>{selectedDeal.probability || 0}%</span>
+                                </label>
+                                <input 
+                                    type="range" 
+                                    min="0" max="100" step="5"
+                                    className="w-full accent-blue-600"
+                                    value={selectedDeal.probability || 0}
+                                    onChange={e => setSelectedDeal({...selectedDeal, probability: parseInt(e.target.value)})}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Linked Contact</label>
+                                <select className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedDeal.contact_id || ''} onChange={e => setSelectedDeal({...selectedDeal, contact_id: Number(e.target.value)})}>
+                                    <option value="">Select Contact...</option>
+                                    {contacts.map(c => <option key={c.id} value={c.id}>{c.name} ({c.company})</option>)}
+                                </select>
+                            </div>
+                            
+                            <div className="flex gap-3 pt-4">
+                                <button type="submit" className="flex-1 bg-blue-600 text-white font-bold py-2 rounded">Save Deal</button>
+                                <button type="button" onClick={() => { setIsEditingDeal(false); setSelectedDeal(null); }} className="px-4 text-slate-500">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
-    return null;
 };
 
 export default CRM;

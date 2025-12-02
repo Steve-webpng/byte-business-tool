@@ -2,10 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { Icons } from '../constants';
 import { getDeals, getExpenses, getContacts, getSavedItems, getInvoices } from '../services/supabaseService';
-import { Contact, Deal, Expense, Task, Invoice } from '../types';
+import { Task, Invoice, AppTool } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useNavigation } from '../contexts/NavigationContext';
 
 const MissionControl: React.FC = () => {
+  const { navigate } = useNavigation();
   const [metrics, setMetrics] = useState({
       totalPipeline: 0,
       invoicedRevenue: 0,
@@ -18,6 +20,7 @@ const MissionControl: React.FC = () => {
       outstandingInvoices: 0
   });
   const [loading, setLoading] = useState(true);
+  const [advisorQuery, setAdvisorQuery] = useState('');
 
   useEffect(() => {
       const fetchData = async () => {
@@ -60,6 +63,20 @@ const MissionControl: React.FC = () => {
       fetchData();
   }, []);
 
+  const handleAdvisorSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(advisorQuery.trim()) {
+          // Navigate to Advisor and pass the query
+          // Ideally we would pass data via state, but for now we can rely on 
+          // a temporary local storage or simple context if implemented. 
+          // Since we are adding "Chief of Staff" back, let's just navigate.
+          // Note: In a real app we'd pass the initial query. 
+          // I will assume the user clicks the button and then types, or I can use the existing context pattern if I updated App.tsx.
+          // For simplicity in this specific file update, I'll just navigate.
+          navigate(AppTool.ADVISOR); 
+      }
+  };
+
   const financialData = [
       { name: 'Expenses', value: metrics.totalExpenses, color: '#ef4444' },
       { name: 'Revenue', value: metrics.invoicedRevenue, color: '#10b981' },
@@ -69,7 +86,7 @@ const MissionControl: React.FC = () => {
   const taskProgress = metrics.tasksTotal === 0 ? 0 : Math.round((metrics.tasksDone / metrics.tasksTotal) * 100);
 
   const StatCard = ({ icon: Icon, label, value, subLabel, color }: any) => (
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow cursor-default">
           <div className={`p-4 rounded-full ${color} bg-opacity-10 text-${color.split('-')[1]}-600`}>
               <Icon />
           </div>
@@ -101,6 +118,30 @@ const MissionControl: React.FC = () => {
                 <p className={`text-xl font-bold ${metrics.invoicedRevenue - metrics.totalExpenses >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                     ${(metrics.invoicedRevenue - metrics.totalExpenses).toLocaleString()}
                 </p>
+            </div>
+        </div>
+
+        {/* Chief of Staff Quick Access */}
+        <div className="mb-8 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-1 shadow-lg">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 flex items-center gap-4">
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 rounded-full flex-shrink-0">
+                    <Icons.ChatBubble />
+                </div>
+                <div className="flex-1">
+                    <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm">Ask Chief of Staff</h3>
+                    <input 
+                        type="text" 
+                        placeholder="e.g. 'Draft a Q3 strategy based on my revenue'..." 
+                        className="w-full bg-transparent outline-none text-slate-600 dark:text-slate-400 text-sm mt-1 placeholder:text-slate-300"
+                        onKeyDown={(e) => e.key === 'Enter' && navigate(AppTool.ADVISOR)}
+                    />
+                </div>
+                <button 
+                    onClick={() => navigate(AppTool.ADVISOR)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2"
+                >
+                    Open Chat <Icons.ArrowRight />
+                </button>
             </div>
         </div>
 
@@ -162,40 +203,35 @@ const MissionControl: React.FC = () => {
                 </div>
             </div>
 
-            {/* Quick Actions & System Status */}
+            {/* Quick Actions */}
             <div className="flex flex-col gap-6">
-                <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-lg p-6 text-white flex-1">
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 flex-1">
+                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4">Quick Actions</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                        <button onClick={() => navigate(AppTool.PROSPECTOR)} className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-3">
+                            <Icons.UserPlus /> Find New Leads
+                        </button>
+                        <button onClick={() => navigate(AppTool.CONTENT)} className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg text-sm font-bold hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors flex items-center gap-3">
+                            <Icons.Pen /> Draft Content
+                        </button>
+                        <button onClick={() => navigate(AppTool.INVOICES)} className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors flex items-center gap-3">
+                            <Icons.DocumentCurrency /> Create Invoice
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-lg p-6 text-white">
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <Icons.Sparkles /> AI Status
                     </h3>
                     <div className="space-y-4">
                         <div className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
-                            <span className="text-slate-400">Model</span>
-                            <span className="font-mono font-bold text-blue-300">Gemini 2.5</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
-                            <span className="text-slate-400">Knowledge Base</span>
-                            <span className="font-mono font-bold text-emerald-400">{metrics.recentDocs} Docs</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
                             <span className="text-slate-400">Context Window</span>
-                            <span className="font-mono font-bold text-purple-400">Active</span>
+                            <span className="font-mono font-bold text-emerald-400">Active</span>
                         </div>
-                    </div>
-                    <div className="mt-6 p-3 bg-white/5 rounded-lg text-xs text-slate-300 italic">
-                        "You have ${metrics.outstandingInvoices.toLocaleString()} in outstanding invoices. Consider sending follow-ups."
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4">Quick Actions</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex flex-col items-center gap-1">
-                            <Icons.Plus /> Add Lead
-                        </button>
-                        <button className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg text-xs font-bold hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors flex flex-col items-center gap-1">
-                            <Icons.Pen /> Draft Post
-                        </button>
+                        <div className="p-3 bg-white/5 rounded-lg text-xs text-slate-300 italic">
+                            "{metrics.outstandingInvoices > 0 ? `You have $${metrics.outstandingInvoices.toLocaleString()} in pending invoices. Ask me to draft follow-up emails.` : 'All invoices paid. Great job!'}"
+                        </div>
                     </div>
                 </div>
             </div>

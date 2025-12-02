@@ -1,5 +1,4 @@
 
-
 import { Type } from "@google/genai";
 
 export enum AppTool {
@@ -30,7 +29,14 @@ export enum AppTool {
   FOCUS = 'FOCUS',
   AUTOMATOR = 'AUTOMATOR',
   PROSPECTOR = 'PROSPECTOR',
-  FINANCIALS = 'FINANCIALS'
+  FINANCIALS = 'FINANCIALS',
+  // New Tools
+  EMAIL_MARKETING = 'EMAIL_MARKETING',
+  SOCIAL_MEDIA = 'SOCIAL_MEDIA',
+  STRATEGY_HUB = 'STRATEGY_HUB',
+  TRENDS = 'TRENDS',
+  TEAM = 'TEAM',
+  ANALYTICS_DASH = 'ANALYTICS_DASH'
 }
 
 // Workspace & Collaboration
@@ -45,6 +51,7 @@ export interface User {
   name: string;
   avatar?: string; // URL or Initials
   email: string;
+  role?: 'Admin' | 'Editor' | 'Publisher' | 'Viewer';
 }
 
 export interface Comment {
@@ -104,6 +111,13 @@ export interface ResearchResult {
   sources: GroundingChunk[];
 }
 
+export interface SWOTAnalysis {
+  strengths: string[];
+  weaknesses: string[];
+  opportunities: string[];
+  threats: string[];
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
@@ -135,6 +149,7 @@ export interface Task {
   dueDate?: string; // ISO Date String
   project?: string; // Project Name / Category
   assignee_id?: string; // ID of User
+  tags?: string[];
 }
 
 export interface BoardColumn {
@@ -187,6 +202,7 @@ export interface Contact {
   notes: string;
   last_contacted?: string; // ISO Date
   follow_up_date?: string; // ISO Date
+  lead_score?: number; // 0-100
 }
 
 // Sales Pipeline / Deals
@@ -201,6 +217,7 @@ export interface Deal {
     contact_id: number; // Foreign key to Contact
     stage: DealStage;
     notes: string;
+    probability?: number; // 0-100
 }
 
 // Calendar
@@ -284,6 +301,8 @@ export interface Lesson {
 }
 
 // Video Creator
+export type VideoAspectRatio = '16:9' | '9:16';
+
 export interface VideoScene {
   startTime: number;
   endTime: number;
@@ -356,4 +375,53 @@ export interface Candidate {
   fit_score?: number; // 1-10 AI Score
   ai_summary?: string;
   created_at?: string;
+}
+
+// Settings
+export interface AppIntegration {
+  id: string;
+  name: string;
+  connected: boolean;
+  icon: string;
+  description?: string;
+  config?: Record<string, string>;
+}
+
+export interface NotificationSetting {
+  id: string;
+  label: string;
+  email: boolean;
+  push: boolean;
+}
+
+// New Types for Marketing Suite
+export interface SocialPost {
+  id: string;
+  platform: 'twitter' | 'linkedin' | 'instagram' | 'facebook';
+  content: string;
+  scheduledTime?: string;
+  status: 'draft' | 'scheduled' | 'published';
+  image?: string;
+  hashtags?: string[];
+}
+
+export interface EmailCampaign {
+  id: string;
+  name: string;
+  subject: string;
+  status: 'draft' | 'sending' | 'sent';
+  openRate?: number;
+  clickRate?: number;
+  sentCount?: number;
+  type: 'broadcast' | 'drip';
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  demographics: string;
+  painPoints: string[];
+  goals: string[];
+  bio: string;
 }

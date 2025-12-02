@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -199,7 +197,7 @@ const AppContent: React.FC = () => {
       case AppTool.STRATEGY_HUB:
         return <StrategyHub key={key} />;
       case AppTool.SOCIAL_MEDIA:
-        return <SocialMediaManager key={key} />;
+        return <SocialMediaManager key={key} workflowData={workflowData} clearWorkflowData={clearWorkflowData} />;
       case AppTool.TRENDS:
         return <TrendAnalyzer key={key} />;
       case AppTool.TEAM:

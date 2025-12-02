@@ -205,6 +205,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
                   onClick={() => setTool(AppTool.CONTENT)}
                 />
                 <Widget 
+                  title="Social Media" 
+                  desc="Schedule and generate posts."
+                  icon={Icons.Share}
+                  color="bg-sky-500"
+                  onClick={() => setTool(AppTool.SOCIAL_MEDIA)}
+                />
+                <Widget 
                   title="Video Studio" 
                   desc="Turn audio into social videos."
                   icon={Icons.Film}
@@ -218,47 +225,40 @@ const Dashboard: React.FC<DashboardProps> = ({ setTool }) => {
                   color="bg-orange-500"
                   onClick={() => setTool(AppTool.EMAIL_MARKETING)}
                 />
-                <Widget 
-                  title="Audio Studio" 
-                  desc="Text-to-speech generation."
-                  icon={Icons.SpeakerWave}
-                  color="bg-cyan-500"
-                  onClick={() => setTool(AppTool.AUDIO_STUDIO)}
-                />
               </div>
           </div>
 
-          {/* Analysis */}
+          {/* Analysis & Ops */}
           <div>
               <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">Intelligence & Ops</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Widget 
+                  title="Trend Analyzer" 
+                  desc="Identify market shifts."
+                  icon={Icons.TrendingUp}
+                  color="bg-fuchsia-500"
+                  onClick={() => setTool(AppTool.TRENDS)}
+                />
+                <Widget 
                   title="Market Research" 
-                  desc="Competitor and trend analysis."
+                  desc="Competitor analysis."
                   icon={Icons.Search}
                   color="bg-teal-500"
                   onClick={() => setTool(AppTool.RESEARCH)}
                 />
                 <Widget 
-                  title="Data Analysis" 
-                  desc="Visualize CSVs or chart images."
-                  icon={Icons.Chart}
-                  color="bg-sky-500"
-                  onClick={() => setTool(AppTool.ANALYSIS)}
-                />
-                <Widget 
-                  title="Projects" 
-                  desc="Kanban board and tasks."
+                  title="Projects & Team" 
+                  desc="Tasks, workflows, and approvals."
                   icon={Icons.Board}
                   color="bg-emerald-500"
                   onClick={() => setTool(AppTool.PROJECTS)}
                 />
                 <Widget 
-                  title="App Library" 
-                  desc="200+ specialized micro-tools."
-                  icon={Icons.Apps}
-                  color="bg-slate-500"
-                  onClick={() => setTool(AppTool.LIBRARY)}
+                  title="Marketing Analytics" 
+                  desc="Track content performance."
+                  icon={Icons.Chart}
+                  color="bg-blue-600"
+                  onClick={() => setTool(AppTool.ANALYTICS_DASH)}
                 />
               </div>
           </div>

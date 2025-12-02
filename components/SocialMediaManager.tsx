@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 import { runGenericTool } from '../services/geminiService';
 import { SocialPost } from '../types';
 import { useToast } from './ToastContainer';
 
-const SocialMediaManager: React.FC = () => {
+interface SocialMediaManagerProps {
+    workflowData?: string | null;
+    clearWorkflowData?: () => void;
+}
+
+const SocialMediaManager: React.FC<SocialMediaManagerProps> = ({ workflowData, clearWorkflowData }) => {
     const [posts, setPosts] = useState<SocialPost[]>([
         { id: '1', platform: 'twitter', content: 'Exciting news coming soon! #LaunchDay', scheduledTime: '2024-06-15 10:00', status: 'scheduled' },
         { id: '2', platform: 'linkedin', content: 'We are hiring! Check our careers page.', scheduledTime: '2024-06-16 09:00', status: 'draft' }
@@ -12,6 +18,14 @@ const SocialMediaManager: React.FC = () => {
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const toast = useToast();
+
+    useEffect(() => {
+        if (workflowData && clearWorkflowData) {
+            setTopic(workflowData);
+            clearWorkflowData();
+            toast.show("Content loaded from workflow!", "info");
+        }
+    }, [workflowData, clearWorkflowData]);
 
     const handleGenerate = async () => {
         if(!topic) return;
@@ -25,7 +39,9 @@ const SocialMediaManager: React.FC = () => {
             
             const res = await runGenericTool(prompt, "You are a social media manager. Return JSON.");
             try {
-                const parsed = JSON.parse(res);
+                // Attempt to clean code blocks if present
+                const cleanRes = res.replace(/```json\n?|\n?```/g, '').trim();
+                const parsed = JSON.parse(cleanRes);
                 const newPosts = parsed.map((p: any) => ({
                     id: Date.now() + Math.random().toString(),
                     platform: p.platform.toLowerCase(),
@@ -69,13 +85,13 @@ const SocialMediaManager: React.FC = () => {
                         <textarea 
                             value={topic}
                             onChange={e => setTopic(e.target.value)}
-                            placeholder="What do you want to post about?"
+                            placeholder="What do you want to post about? Or paste content here..."
                             className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg h-32 mb-4 outline-none"
                         />
                         <button 
                             onClick={handleGenerate}
                             disabled={loading || !topic}
-                            className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                         >
                             {loading ? 'Generating...' : 'Auto-Generate Posts'}
                         </button>
@@ -111,7 +127,7 @@ const SocialMediaManager: React.FC = () => {
                                             {post.status}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-slate-700 dark:text-slate-300 mb-2">{post.content}</p>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 mb-2 whitespace-pre-wrap">{post.content}</p>
                                     {post.scheduledTime && (
                                         <div className="text-xs text-slate-400 flex items-center gap-1">
                                             <Icons.CalendarDays /> {post.scheduledTime}

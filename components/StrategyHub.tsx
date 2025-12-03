@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Icons } from '../constants';
 import { runGenericTool } from '../services/geminiService';
 import MarkdownRenderer from './MarkdownRenderer';
 
 const StrategyHub: React.FC = () => {
-    const [activeModule, setActiveModule] = useState<'persona' | 'strategy' | 'eval'>('persona');
+    const [activeModule, setActiveModule] = useState<'persona' | 'strategy' | 'eval' | 'launch'>('persona');
     const [input, setInput] = useState('');
     const [output, setOutput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -19,6 +20,18 @@ const StrategyHub: React.FC = () => {
             title: "Marketing Strategy Planner", 
             prompt: "Create a comprehensive Marketing Strategy for this business. Include Goals, Channels, Content Pillars, Budget Allocation estimates, and a Timeline.",
             icon: Icons.Telescope 
+        },
+        launch: {
+            title: "Viral Launch Blueprint",
+            prompt: `Design an "Upgraded" 4-Week Product Launch Campaign based on the product description provided.
+            
+            Structure:
+            1. **Pre-Launch (Hype Phase):** Define a "Waitlist" strategy with a viral referral mechanic (e.g. "Refer 3 friends for early access"). Draft an influencer seeding plan.
+            2. **Launch Day (The Drop):** Create a "Scarcity" tactic (e.g. "First 500 orders only"). Draft a high-urgency SMS notification script. Plan a "Livestream" event concept.
+            3. **Post-Launch (Retention):** Design a User Generated Content (UGC) contest to keep momentum. Draft a "Thank You" email sequence that cross-sells.
+            
+            Output as a detailed Markdown plan.`,
+            icon: Icons.Megaphone
         },
         eval: { 
             title: "Business Evaluator (SWOT/PESTEL)", 

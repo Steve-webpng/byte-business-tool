@@ -27,7 +27,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
   const [generatedText, setGeneratedText] = useState('');
   const [generatedImage, setGeneratedImage] = useState('');
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
-  const [activeTab, setActiveTab] = useState<'email' | 'linkedin' | 'twitter'>('email');
+  const [activeTab, setActiveTab] = useState<'email' | 'linkedin' | 'twitter' | 'sms' | 'viral' | 'influencer'>('email');
   const [showPreview, setShowPreview] = useState(false);
   const [recentDrafts, setRecentDrafts] = useState<SavedItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -199,6 +199,9 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
           if (activeTab === 'email') textToSpeak = campaign.emailBody;
           else if (activeTab === 'linkedin') textToSpeak = campaign.linkedinPost;
           else if (activeTab === 'twitter') textToSpeak = campaign.twitterThread.join('. ');
+          else if (activeTab === 'sms') textToSpeak = campaign.smsCopy || '';
+          else if (activeTab === 'viral') textToSpeak = campaign.viralHook || '';
+          else if (activeTab === 'influencer') textToSpeak = campaign.influencerBrief || '';
       }
 
       // Clean markdown
@@ -480,6 +483,9 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                             if(activeTab === 'email') data = `Subject: ${campaign.emailSubject}\n\n${campaign.emailBody}`;
                             else if(activeTab === 'linkedin') data = campaign.linkedinPost;
                             else if(activeTab === 'twitter') data = campaign.twitterThread.join('\n\n');
+                            else if(activeTab === 'sms') data = campaign.smsCopy || '';
+                            else if(activeTab === 'viral') data = campaign.viralHook || '';
+                            else if(activeTab === 'influencer') data = campaign.influencerBrief || '';
                         }
                         onWorkflowSend(AppTool.DOCUMENTS, data);
                     }}
@@ -547,10 +553,13 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                 )
             ) : mode === 'Campaign' && campaign ? (
                 <div className="flex flex-col h-full">
-                    <div className="flex gap-2 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">
-                        <button onClick={() => setActiveTab('email')} className={`px-3 py-1 text-sm font-bold rounded-md ${activeTab === 'email' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Email</button>
-                        <button onClick={() => setActiveTab('linkedin')} className={`px-3 py-1 text-sm font-bold rounded-md ${activeTab === 'linkedin' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>LinkedIn</button>
-                        <button onClick={() => setActiveTab('twitter')} className={`px-3 py-1 text-sm font-bold rounded-md ${activeTab === 'twitter' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Twitter</button>
+                    <div className="flex gap-2 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2 overflow-x-auto">
+                        <button onClick={() => setActiveTab('email')} className={`px-3 py-1 text-sm font-bold rounded-md whitespace-nowrap ${activeTab === 'email' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Email</button>
+                        <button onClick={() => setActiveTab('linkedin')} className={`px-3 py-1 text-sm font-bold rounded-md whitespace-nowrap ${activeTab === 'linkedin' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>LinkedIn</button>
+                        <button onClick={() => setActiveTab('twitter')} className={`px-3 py-1 text-sm font-bold rounded-md whitespace-nowrap ${activeTab === 'twitter' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Twitter</button>
+                        <button onClick={() => setActiveTab('sms')} className={`px-3 py-1 text-sm font-bold rounded-md whitespace-nowrap ${activeTab === 'sms' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>SMS</button>
+                        <button onClick={() => setActiveTab('viral')} className={`px-3 py-1 text-sm font-bold rounded-md whitespace-nowrap ${activeTab === 'viral' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Viral Hook</button>
+                        <button onClick={() => setActiveTab('influencer')} className={`px-3 py-1 text-sm font-bold rounded-md whitespace-nowrap ${activeTab === 'influencer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>Influencer</button>
                     </div>
                     <div className="flex-1 overflow-y-auto">
                         {activeTab === 'email' && (
@@ -568,6 +577,23 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                                         {tweet}
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                        {activeTab === 'sms' && (
+                            <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono whitespace-pre-wrap">
+                                {campaign.smsCopy || "No SMS copy generated."}
+                            </div>
+                        )}
+                        {activeTab === 'viral' && (
+                            <div className="p-4 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg text-sm">
+                                <h4 className="text-purple-600 dark:text-purple-400 font-bold mb-2">Viral Loop Strategy</h4>
+                                <MarkdownRenderer content={campaign.viralHook || "No viral hook generated."} />
+                            </div>
+                        )}
+                        {activeTab === 'influencer' && (
+                            <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm">
+                                <h4 className="text-slate-600 dark:text-slate-400 font-bold mb-2">Influencer / Creator Brief</h4>
+                                <MarkdownRenderer content={campaign.influencerBrief || "No brief generated."} />
                             </div>
                         )}
                     </div>

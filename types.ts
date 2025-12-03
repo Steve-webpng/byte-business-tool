@@ -163,6 +163,9 @@ export interface MarketingCampaign {
   emailBody: string;
   linkedinPost: string;
   twitterThread: string[];
+  smsCopy?: string;
+  viralHook?: string;
+  influencerBrief?: string;
 }
 
 export interface TranscriptItem {

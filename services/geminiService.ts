@@ -41,7 +41,7 @@ export const analyzeBrandVoice = async (sampleText: string): Promise<string> => 
 
 export const generateMarketingCampaign = async (topic: string, tone: string, context?: string): Promise<MarketingCampaign> => {
   const ai = getAIClient();
-  const prompt = `${context || ''}\nTopic: ${topic}\nTone: ${tone}\n\nCreate a multi-channel marketing campaign.\n1. An Email (Subject + Body)\n2. A LinkedIn Post\n3. A Twitter Thread (Array of strings)\n\nReturn strict JSON.`;
+  const prompt = `${context || ''}\nTopic: ${topic}\nTone: ${tone}\n\nCreate a multi-channel "Upgraded" marketing campaign.\n1. An Email (Subject + Body)\n2. A LinkedIn Post\n3. A Twitter Thread (Array of strings)\n4. SMS Marketing Copy (Short, Urgent, High CTR)\n5. A "Viral Hook" or Loop idea to get referrals\n6. An Influencer Brief (Instructions for creators)\n\nReturn strict JSON.`;
   const response = await ai.models.generateContent({
     model: getModel(),
     contents: prompt,
@@ -53,9 +53,12 @@ export const generateMarketingCampaign = async (topic: string, tone: string, con
           emailSubject: { type: Type.STRING },
           emailBody: { type: Type.STRING },
           linkedinPost: { type: Type.STRING },
-          twitterThread: { type: Type.ARRAY, items: { type: Type.STRING } }
+          twitterThread: { type: Type.ARRAY, items: { type: Type.STRING } },
+          smsCopy: { type: Type.STRING },
+          viralHook: { type: Type.STRING },
+          influencerBrief: { type: Type.STRING }
         },
-        required: ["emailSubject", "emailBody", "linkedinPost", "twitterThread"]
+        required: ["emailSubject", "emailBody", "linkedinPost", "twitterThread", "smsCopy", "viralHook"]
       }
     }
   });

@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useTransition } from 'react';
 import { AppTool, ToolDefinition } from '../types';
 
 interface NavigationContextType {
@@ -10,6 +10,7 @@ interface NavigationContextType {
   navigate: (tool: AppTool, def?: ToolDefinition) => void;
   setMobileOpen: (isOpen: boolean) => void;
   setCommandPaletteOpen: (isOpen: boolean) => void;
+  isPending: boolean;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -19,12 +20,18 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [selectedToolDef, setSelectedToolDef] = useState<ToolDefinition | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const navigate = (tool: AppTool, def?: ToolDefinition) => {
-    if (def) setSelectedToolDef(def);
-    setCurrentToolState(tool);
+    // Immediate updates for UI responsiveness (closing menus)
     setIsMobileOpen(false);
     setIsCommandPaletteOpen(false);
+
+    // Defer the heavy state update that triggers the main content re-render
+    startTransition(() => {
+        if (def) setSelectedToolDef(def);
+        setCurrentToolState(tool);
+    });
   };
 
   const setMobileOpen = (isOpen: boolean) => setIsMobileOpen(isOpen);
@@ -38,7 +45,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       isCommandPaletteOpen,
       navigate,
       setMobileOpen,
-      setCommandPaletteOpen
+      setCommandPaletteOpen,
+      isPending
     }}>
       {children}
     </NavigationContext.Provider>

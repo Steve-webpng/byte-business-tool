@@ -196,8 +196,10 @@ export interface Contact {
   created_at?: string;
   name: string;
   email: string;
+  phone?: string;
   company: string;
   role: string;
+  location?: string;
   status: ContactStatus;
   notes: string;
   last_contacted?: string; // ISO Date
@@ -336,12 +338,17 @@ export interface Automation {
 
 // Prospector
 export interface Prospect {
+  id?: string;
   name: string;
   role: string;
   company: string;
   email?: string;
-  linkedin?: string;
+  phone?: string;
+  location?: string;
+  socialPlatform?: 'LinkedIn' | 'Twitter' | 'Instagram' | 'Facebook' | 'TikTok';
+  profileUrl?: string;
   confidence: number;
+  status?: 'New' | 'Exported';
 }
 
 export interface VersionHistory {

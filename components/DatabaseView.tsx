@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 import { initSupabase, testConnection, getSavedItems, deleteItem, getSupabaseConfig, disconnectSupabase } from '../services/supabaseService';
@@ -36,6 +35,8 @@ create table if not exists contacts (
   workspace_id text not null,
   name text not null,
   email text,
+  phone text,
+  location text,
   company text,
   role text,
   status text default 'Lead' not null,

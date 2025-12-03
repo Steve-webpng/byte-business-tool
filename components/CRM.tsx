@@ -168,7 +168,7 @@ const CRM: React.FC = () => {
                     <button 
                         onClick={() => {
                             if (view === 'contacts') {
-                                setSelectedContact({ name: '', email: '', company: '', role: '', status: 'Lead', notes: '', lead_score: 10 });
+                                setSelectedContact({ name: '', email: '', company: '', role: '', status: 'Lead', notes: '', lead_score: 10, phone: '', location: '' });
                                 setIsEditing(true);
                             } else {
                                 setSelectedDeal({ name: '', value: 0, contact_id: 0, stage: 'Lead In', notes: '', probability: 20 });
@@ -205,7 +205,7 @@ const CRM: React.FC = () => {
                                 <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-xs uppercase sticky top-0 z-10">
                                     <tr>
                                         <th className="p-4 font-bold">Name</th>
-                                        <th className="p-4 font-bold">Role & Company</th>
+                                        <th className="p-4 font-bold">Contact Info</th>
                                         <th className="p-4 font-bold">Status</th>
                                         <th className="p-4 font-bold">Lead Score</th>
                                         <th className="p-4 font-bold text-right">Actions</th>
@@ -216,11 +216,14 @@ const CRM: React.FC = () => {
                                         <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
                                             <td className="p-4">
                                                 <div className="font-bold text-slate-800 dark:text-slate-200">{c.name}</div>
-                                                <div className="text-xs text-slate-400">{c.email}</div>
+                                                <div className="text-xs text-slate-500">{c.role} @ <span className="font-semibold text-blue-600">{c.company}</span></div>
                                             </td>
                                             <td className="p-4">
-                                                <div className="text-sm text-slate-700 dark:text-slate-300">{c.role}</div>
-                                                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold">{c.company}</div>
+                                                <div className="text-sm text-slate-700 dark:text-slate-300">{c.email}</div>
+                                                <div className="text-xs text-slate-400 flex gap-2">
+                                                    {c.phone && <span>📞 {c.phone}</span>}
+                                                    {c.location && <span>📍 {c.location}</span>}
+                                                </div>
                                             </td>
                                             <td className="p-4">
                                                 <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${c.status === 'Customer' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -324,6 +327,22 @@ const CRM: React.FC = () => {
                                             </select>
                                         </div>
                                     </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                                            <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.email} onChange={e => setSelectedContact({...selectedContact, email: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Phone</label>
+                                            <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.phone || ''} onChange={e => setSelectedContact({...selectedContact, phone: e.target.value})} />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Location</label>
+                                        <input className="w-full p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.location || ''} onChange={e => setSelectedContact({...selectedContact, location: e.target.value})} placeholder="City, Country" />
+                                    </div>
                                     
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex justify-between">
@@ -340,7 +359,7 @@ const CRM: React.FC = () => {
 
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notes</label>
-                                        <textarea className="w-full p-2 border rounded h-32 bg-slate-50 dark:bg-slate-900 dark:border-slate-600" value={selectedContact.notes} onChange={e => setSelectedContact({...selectedContact, notes: e.target.value})} />
+                                        <textarea className="w-full p-2 border rounded h-24 bg-slate-50 dark:bg-slate-900 dark:border-slate-600 resize-none" value={selectedContact.notes} onChange={e => setSelectedContact({...selectedContact, notes: e.target.value})} />
                                     </div>
                                     
                                     <div className="flex gap-3 pt-4">

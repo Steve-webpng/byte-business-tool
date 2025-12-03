@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene, VideoAspectRatio, SWOTAnalysis } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene, VideoAspectRatio, SWOTAnalysis, Prospect } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 import { getSavedItems } from "./supabaseService";
 
@@ -227,19 +227,38 @@ export const generateFollowUpEmail = async (contact: Contact, context?: string):
     return response.text || "Failed to generate email.";
 };
 
-export const discoverLeads = async (query: string): Promise<{ name: string; role: string; company: string; }[]> => {
+export const discoverLeads = async (query: string, platform?: string): Promise<Prospect[]> => {
     const ai = getAIClient();
-    const prompt = `Using Google Search, identify potential business leads matching: "${query}".\nReturn JSON array of objects with "name", "role", "company".`;
+    const platformSpecific = platform ? `Focus search results specifically on ${platform}.` : '';
+    const prompt = `Using Google Search, identify 6-10 high-quality business leads matching: "${query}".
+    ${platformSpecific}
+    
+    For each lead, perform a deep search to find:
+    - Name
+    - Role
+    - Company
+    - Location (City/Country)
+    - Guess/Find Email (professional format)
+    - Social Profile URL (e.g. LinkedIn, Twitter, Instagram link if found)
+    
+    Return a JSON array of objects with "name", "role", "company", "location", "email", "phone", "profileUrl".`;
+    
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: { tools: [{ googleSearch: {} }] },
     });
+    
     const text = response.text?.trim();
     if (!text) return [];
     try {
-      const leads = JSON.parse(text);
-      return Array.isArray(leads) ? leads : [];
+      const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
+      const leads = JSON.parse(jsonStr);
+      return Array.isArray(leads) ? leads.map((l: any) => ({
+          ...l, 
+          socialPlatform: platform || 'LinkedIn', // Default or dynamic
+          confidence: 85
+      })) : [];
     } catch (e) { return []; }
 };
 
@@ -530,7 +549,7 @@ export const analyzeSessionTranscript = async (transcript: TranscriptItem[]): Pr
 export const generateCourseSyllabus = async (topic: string): Promise<Course> => {
     const ai = getAIClient();
     const prompt = `Create syllabus for "${topic}". JSON: {title, description, modules:[{title, lessons:[{title}]}]}.`;
-    const response = await ai.models.generateContent({ model: getModel(), contents: prompt, config: { responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, modules: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, lessons: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING } }, required: ["title"] } } }, required: ["title", "lessons"] } } }, required: ["title", "description", "modules"] } } });
+    const response = await ai.models.generateContent({ model: getModel(), contents: prompt, config: { responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, modules: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, lessons: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, lessons: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, isCompleted: { type: Type.BOOLEAN } }, required: ["title"] } } }, required: ["title", "lessons"] } } }, required: ["title", "description", "modules"] } } });
     const data = JSON.parse(response.text || "{}");
     const course: Course = { id: `course-${Date.now()}`, title: data.title, description: data.description, modules: data.modules.map((m: any) => ({ title: m.title, lessons: m.lessons.map((l: any) => ({ id: `lesson-${Math.random().toString(36).substr(2,9)}`, title: l.title, isCompleted: false })) })), totalLessons: 0, completedLessons: 0 };
     course.totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);

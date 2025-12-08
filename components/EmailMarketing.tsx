@@ -1,19 +1,25 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 import { useToast } from './ToastContainer';
-import { runGenericTool } from '../services/geminiService';
-import { EmailCampaign } from '../types';
+import { runGenericTool, generateDripSequence } from '../services/geminiService';
+import { getContacts } from '../services/supabaseService';
+import { EmailCampaign, AudienceSegment, DripSequence, DripStep, Contact } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 import MarkdownRenderer from './MarkdownRenderer';
 
 const EmailMarketing: React.FC = () => {
-    const [view, setView] = useState<'dashboard' | 'wizard'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'wizard' | 'automations' | 'segments'>('dashboard');
     const [step, setStep] = useState(1);
     const [aiLoading, setAiLoading] = useState(false);
     const toast = useToast();
 
-    // Campaign State
+    // Data State
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [segments, setSegments] = useState<AudienceSegment[]>([]);
+    const [drips, setDrips] = useState<DripSequence[]>([]);
+
+    // Campaign Wizard State
     const [campaignData, setCampaignData] = useState({
         name: '',
         goal: 'Sales',
@@ -21,6 +27,17 @@ const EmailMarketing: React.FC = () => {
         subject: '',
         body: '',
     });
+
+    // Segment Builder State
+    const [newSegment, setNewSegment] = useState<AudienceSegment>({
+        id: '', name: '', criteria: [{ field: 'status', operator: 'equals', value: 'Lead' }]
+    });
+
+    // Drip Builder State
+    const [newDrip, setNewDrip] = useState<DripSequence>({
+        id: '', name: '', segmentId: '', status: 'draft', steps: []
+    });
+    const [dripGoal, setDripGoal] = useState('');
 
     // AI Features State
     const [subjectIdeas, setSubjectIdeas] = useState<string[]>([]);
@@ -42,6 +59,26 @@ const EmailMarketing: React.FC = () => {
         { id: '2', name: 'Welcome Sequence', subject: 'Welcome to the family!', status: 'sending', openRate: 68.0, clickRate: 24.1, sentCount: 300, type: 'drip' },
         { id: '3', name: 'Webinar Invite', subject: 'Last chance to register', status: 'draft', type: 'broadcast' },
     ];
+
+    useEffect(() => {
+        // Load initial data
+        getContacts().then(setContacts);
+        // Load persisted segments/drips if available (mocking with local storage for now)
+        const savedSegments = localStorage.getItem('byete_segments');
+        if (savedSegments) setSegments(JSON.parse(savedSegments));
+        const savedDrips = localStorage.getItem('byete_drips');
+        if (savedDrips) setDrips(JSON.parse(savedDrips));
+    }, []);
+
+    const saveSegments = (newSegments: AudienceSegment[]) => {
+        setSegments(newSegments);
+        localStorage.setItem('byete_segments', JSON.stringify(newSegments));
+    };
+
+    const saveDrips = (newDrips: DripSequence[]) => {
+        setDrips(newDrips);
+        localStorage.setItem('byete_drips', JSON.stringify(newDrips));
+    };
 
     const handleGenerateSubjects = async () => {
         if (!campaignData.goal || !campaignData.name) {
@@ -100,7 +137,6 @@ const EmailMarketing: React.FC = () => {
             
             const result = await runGenericTool(prompt, "You are a deliverability expert. Return strict JSON.");
             try {
-                // Attempt to parse JSON from response, handling potential markdown code blocks
                 const jsonStr = result.replace(/```json\n?|\n?```/g, '').trim();
                 const parsed = JSON.parse(jsonStr);
                 setSpamScore(parsed);
@@ -123,6 +159,285 @@ const EmailMarketing: React.FC = () => {
         setSubjectIdeas([]);
         setSpamScore(null);
     };
+
+    // --- SEGMENT LOGIC ---
+    const handleCreateSegment = () => {
+        if (!newSegment.name) return;
+        const seg: AudienceSegment = { ...newSegment, id: `seg-${Date.now()}`, contactCount: Math.floor(Math.random() * 50) + 1 };
+        saveSegments([...segments, seg]);
+        setNewSegment({ id: '', name: '', criteria: [{ field: 'status', operator: 'equals', value: 'Lead' }] });
+        toast.show("Segment created", "success");
+    };
+
+    const deleteSegment = (id: string) => {
+        saveSegments(segments.filter(s => s.id !== id));
+    };
+
+    // --- DRIP LOGIC ---
+    const handleCreateDrip = () => {
+        setNewDrip({ id: `drip-${Date.now()}`, name: 'New Automation', segmentId: '', status: 'draft', steps: [] });
+        setView('automations');
+    };
+
+    const handleGenerateDrip = async () => {
+        if (!dripGoal) return;
+        setAiLoading(true);
+        try {
+            const steps = await generateDripSequence(dripGoal, newDrip.segmentId || 'General Audience');
+            setNewDrip(prev => ({ ...prev, steps }));
+            toast.show("Drip sequence generated!", "success");
+        } catch (e) {
+            toast.show("Failed to generate drip.", "error");
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const saveCurrentDrip = () => {
+        if (!newDrip.name) return;
+        const existingIdx = drips.findIndex(d => d.id === newDrip.id);
+        const updatedDrips = [...drips];
+        if (existingIdx > -1) updatedDrips[existingIdx] = newDrip;
+        else updatedDrips.push(newDrip);
+        
+        saveDrips(updatedDrips);
+        toast.show("Automation saved.", "success");
+        // Don't change view, stay in editor
+    };
+
+    const renderSegmentBuilder = () => (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 h-full flex flex-col">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-6 flex items-center gap-2">
+                <Icons.Users /> Audience Segments
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 min-h-0">
+                <div className="flex flex-col gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 className="font-bold text-sm mb-4 text-slate-700 dark:text-slate-300">Create New Segment</h4>
+                        <div className="space-y-3">
+                            <input 
+                                className="w-full p-2 rounded border text-sm dark:bg-slate-800 dark:border-slate-600"
+                                placeholder="Segment Name (e.g. High Value Leads)"
+                                value={newSegment.name}
+                                onChange={e => setNewSegment({...newSegment, name: e.target.value})}
+                            />
+                            {newSegment.criteria.map((crit, idx) => (
+                                <div key={idx} className="flex gap-2">
+                                    <select 
+                                        className="flex-1 p-2 rounded border text-sm dark:bg-slate-800 dark:border-slate-600"
+                                        value={crit.field}
+                                        onChange={e => {
+                                            const updated = [...newSegment.criteria];
+                                            updated[idx].field = e.target.value as any;
+                                            setNewSegment({...newSegment, criteria: updated});
+                                        }}
+                                    >
+                                        <option value="status">Status</option>
+                                        <option value="lead_score">Lead Score</option>
+                                        <option value="location">Location</option>
+                                        <option value="role">Role</option>
+                                    </select>
+                                    <select 
+                                        className="flex-1 p-2 rounded border text-sm dark:bg-slate-800 dark:border-slate-600"
+                                        value={crit.operator}
+                                        onChange={e => {
+                                            const updated = [...newSegment.criteria];
+                                            updated[idx].operator = e.target.value as any;
+                                            setNewSegment({...newSegment, criteria: updated});
+                                        }}
+                                    >
+                                        <option value="equals">Is</option>
+                                        <option value="contains">Contains</option>
+                                        <option value="greater_than">Greater Than</option>
+                                    </select>
+                                    <input 
+                                        className="flex-1 p-2 rounded border text-sm dark:bg-slate-800 dark:border-slate-600"
+                                        value={crit.value}
+                                        onChange={e => {
+                                            const updated = [...newSegment.criteria];
+                                            updated[idx].value = e.target.value;
+                                            setNewSegment({...newSegment, criteria: updated});
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                            <button onClick={handleCreateSegment} className="w-full bg-blue-600 text-white font-bold py-2 rounded text-sm hover:bg-blue-700">
+                                Save Segment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-y-auto">
+                    <h4 className="font-bold text-sm mb-4 text-slate-700 dark:text-slate-300">Existing Segments</h4>
+                    <div className="space-y-3">
+                        {segments.length === 0 && <p className="text-slate-400 text-xs italic">No custom segments yet.</p>}
+                        {segments.map(seg => (
+                            <div key={seg.id} className="flex justify-between items-center p-3 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
+                                <div>
+                                    <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{seg.name}</div>
+                                    <div className="text-xs text-slate-500">{seg.criteria.length} conditions • ~{seg.contactCount} contacts</div>
+                                </div>
+                                <button onClick={() => deleteSegment(seg.id)} className="text-slate-400 hover:text-red-500"><Icons.Trash /></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderDripBuilder = () => (
+        <div className="h-full flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => { setView('dashboard'); setNewDrip({id: '', name: '', segmentId: '', status: 'draft', steps: []}); }} className="text-slate-400 hover:text-slate-600"><Icons.ArrowLeft /></button>
+                    <input 
+                        className="bg-transparent font-bold text-lg outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400"
+                        value={newDrip.name}
+                        onChange={e => setNewDrip({...newDrip, name: e.target.value})}
+                        placeholder="Automation Name"
+                    />
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={saveCurrentDrip} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700 flex items-center gap-2">
+                        <Icons.Save /> Save Workflow
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                {/* Visual Flow */}
+                <div className="w-full md:w-1/3 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30 p-4 overflow-y-auto flex flex-col items-center">
+                    <div className="w-full p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-4 relative">
+                        <div className="text-xs font-bold text-slate-400 uppercase mb-1">Trigger</div>
+                        <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
+                            <Icons.Users />
+                            <select 
+                                className="bg-transparent outline-none w-full"
+                                value={newDrip.segmentId}
+                                onChange={e => setNewDrip({...newDrip, segmentId: e.target.value})}
+                            >
+                                <option value="">Select Segment...</option>
+                                {segments.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                <option value="all">All Leads</option>
+                            </select>
+                        </div>
+                        {/* Connecting Line */}
+                        <div className="absolute left-1/2 bottom-0 transform translate-y-full -translate-x-1/2 w-0.5 h-4 bg-slate-300 dark:bg-slate-600"></div>
+                    </div>
+
+                    {newDrip.steps.map((step, idx) => (
+                        <div key={step.id} className="w-full flex flex-col items-center">
+                            {/* Delay Node */}
+                            <div className="bg-slate-200 dark:bg-slate-700 rounded-full px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300 mb-4 shadow-sm z-10 flex items-center gap-1">
+                                <Icons.Clock /> Wait {step.delayDays} Days
+                            </div>
+                            
+                            {/* Email Node */}
+                            <div className="w-full p-4 bg-white dark:bg-slate-800 rounded-xl border border-blue-200 dark:border-blue-900 shadow-sm mb-4 relative group hover:border-blue-400 transition-colors cursor-pointer">
+                                <div className="text-xs font-bold text-blue-500 uppercase mb-1">Email {idx + 1}</div>
+                                <div className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{step.subject}</div>
+                                <div className="text-xs text-slate-500 truncate mt-1">{step.body.substring(0, 30)}...</div>
+                                <button 
+                                    onClick={() => setNewDrip(prev => ({...prev, steps: prev.steps.filter(s => s.id !== step.id)}))}
+                                    className="absolute top-2 right-2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Icons.Trash />
+                                </button>
+                                {/* Connecting Line */}
+                                {idx < newDrip.steps.length - 1 && (
+                                    <div className="absolute left-1/2 bottom-0 transform translate-y-full -translate-x-1/2 w-0.5 h-8 bg-slate-300 dark:bg-slate-600 pointer-events-none"></div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+
+                    <div className="mt-2 w-full p-4 bg-white dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center gap-3">
+                        <input 
+                            className="w-full text-xs p-2 border rounded bg-slate-50 dark:bg-slate-900 dark:border-slate-600"
+                            placeholder="Describe goal to generate flow..."
+                            value={dripGoal}
+                            onChange={e => setDripGoal(e.target.value)}
+                        />
+                        <button 
+                            onClick={handleGenerateDrip}
+                            disabled={aiLoading}
+                            className="w-full bg-purple-600 text-white font-bold py-2 rounded text-xs hover:bg-purple-700 flex justify-center items-center gap-2"
+                        >
+                            {aiLoading ? 'Generating...' : <><Icons.Sparkles /> Magic Generate</>}
+                        </button>
+                        <div className="text-xs text-slate-400">- OR -</div>
+                        <button 
+                            onClick={() => setNewDrip(prev => ({...prev, steps: [...prev.steps, {id: `step-${Date.now()}`, delayDays: 2, subject: 'New Email', body: ''}]}))}
+                            className="text-blue-600 font-bold text-xs hover:underline"
+                        >
+                            + Add Step Manually
+                        </button>
+                    </div>
+                </div>
+
+                {/* Editor */}
+                <div className="w-full md:w-2/3 p-6 overflow-y-auto">
+                    {newDrip.steps.length > 0 ? (
+                        <div className="max-w-2xl mx-auto space-y-6">
+                            <h3 className="font-bold text-slate-700 dark:text-slate-300 text-lg border-b border-slate-100 dark:border-slate-700 pb-2">
+                                Edit Sequence Content
+                            </h3>
+                            {newDrip.steps.map((step, idx) => (
+                                <div key={step.id} className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="font-bold text-blue-600">Email #{idx + 1}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-slate-500">Delay (Days):</span>
+                                            <input 
+                                                type="number" 
+                                                className="w-16 p-1 text-xs border rounded text-center dark:bg-slate-800 dark:border-slate-600"
+                                                value={step.delayDays}
+                                                onChange={e => {
+                                                    const updated = [...newDrip.steps];
+                                                    updated[idx].delayDays = parseInt(e.target.value);
+                                                    setNewDrip({...newDrip, steps: updated});
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <input 
+                                            className="w-full p-2 border rounded font-bold text-sm dark:bg-slate-800 dark:border-slate-600"
+                                            placeholder="Subject Line"
+                                            value={step.subject}
+                                            onChange={e => {
+                                                const updated = [...newDrip.steps];
+                                                updated[idx].subject = e.target.value;
+                                                setNewDrip({...newDrip, steps: updated});
+                                            }}
+                                        />
+                                        <textarea 
+                                            className="w-full p-3 border rounded text-sm h-32 dark:bg-slate-800 dark:border-slate-600 font-mono resize-none"
+                                            placeholder="Email Body (Markdown supported)"
+                                            value={step.body}
+                                            onChange={e => {
+                                                const updated = [...newDrip.steps];
+                                                updated[idx].body = e.target.value;
+                                                setNewDrip({...newDrip, steps: updated});
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                            <Icons.Flow />
+                            <p className="mt-2">Add steps to the sequence to edit content.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 
     const renderWizard = () => {
         return (
@@ -169,7 +484,7 @@ const EmailMarketing: React.FC = () => {
                         <div className="max-w-2xl mx-auto space-y-6">
                             <h4 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-4">Target Audience</h4>
                             <div className="grid grid-cols-2 gap-4">
-                                {['All Leads', 'New Subscribers (Last 30 Days)', 'High Value Customers', 'Inactive Users'].map(seg => (
+                                {['All Leads', 'New Subscribers', ...segments.map(s => s.name)].slice(0, 6).map(seg => (
                                     <div 
                                         key={seg}
                                         onClick={() => setCampaignData({...campaignData, segment: seg})}
@@ -179,13 +494,6 @@ const EmailMarketing: React.FC = () => {
                                         <div className="text-xs text-slate-500 mt-1">~{Math.floor(Math.random() * 500) + 50} recipients</div>
                                     </div>
                                 ))}
-                            </div>
-                            <div className="p-4 bg-purple-50 dark:bg-slate-900/50 rounded-lg border border-purple-100 dark:border-slate-700 flex items-center justify-between">
-                                <div>
-                                    <h5 className="font-bold text-purple-700 dark:text-purple-400 text-sm">Need more leads?</h5>
-                                    <p className="text-xs text-slate-500">Use the Prospector tool to scrape fresh contacts.</p>
-                                </div>
-                                <button className="text-xs bg-white dark:bg-slate-800 border border-purple-200 dark:border-slate-600 text-purple-600 dark:text-purple-400 px-3 py-2 rounded-lg font-bold">Open Prospector</button>
                             </div>
                         </div>
                     )}
@@ -307,98 +615,119 @@ const EmailMarketing: React.FC = () => {
         );
     };
 
+    if (view === 'segments') return renderSegmentBuilder();
+    if (view === 'automations') return renderDripBuilder();
+    if (view === 'wizard') return renderWizard();
+
     // DASHBOARD VIEW
     return (
         <div className="h-full flex flex-col max-w-7xl mx-auto">
-            {view === 'wizard' ? renderWizard() : (
-                <>
-                    <div className="mb-6 flex justify-between items-end">
-                        <div>
-                            <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                <Icons.Mail /> Email Marketing
-                            </h2>
-                            <p className="text-slate-500 dark:text-slate-400">Campaigns, automations, and analytics.</p>
+            <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <Icons.Mail /> Email Marketing
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400">Campaigns, automations, and audience insights.</p>
+                </div>
+                <div className="flex gap-2">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-bold">
+                        <button onClick={() => setView('dashboard')} className="px-4 py-2 rounded-md bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400">Dashboard</button>
+                        <button onClick={() => handleCreateDrip()} className="px-4 py-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 hover:text-slate-700">Automations</button>
+                        <button onClick={() => setView('segments')} className="px-4 py-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 hover:text-slate-700">Segments</button>
+                    </div>
+                    <button 
+                        onClick={() => setView('wizard')}
+                        className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm hover:bg-blue-700 transition-colors text-sm"
+                    >
+                        <Icons.Plus /> New Blast
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+                {/* Analytics */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="text-xs font-bold text-slate-500 uppercase">Avg Open Rate</div>
+                            <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-1">42.5%</div>
+                            <div className="text-xs text-emerald-500 font-bold mt-1">↑ 5.2% vs last month</div>
                         </div>
-                        <button 
-                            onClick={() => setView('wizard')}
-                            className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm hover:bg-blue-700 transition-colors"
-                        >
-                            <Icons.Plus /> New Campaign
-                        </button>
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="text-xs font-bold text-slate-500 uppercase">Click Rate</div>
+                            <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-1">12.8%</div>
+                            <div className="text-xs text-slate-400 font-bold mt-1">→ Stable</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="text-xs font-bold text-slate-500 uppercase">Total Sent</div>
+                            <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-1">12.4k</div>
+                            <div className="text-xs text-emerald-500 font-bold mt-1">↑ 1.2k new</div>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-                        {/* Analytics */}
-                        <div className="lg:col-span-2 flex flex-col gap-6">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                    <div className="text-xs font-bold text-slate-500 uppercase">Avg Open Rate</div>
-                                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-1">42.5%</div>
-                                    <div className="text-xs text-emerald-500 font-bold mt-1">↑ 5.2% vs last month</div>
-                                </div>
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                    <div className="text-xs font-bold text-slate-500 uppercase">Click Rate</div>
-                                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-1">12.8%</div>
-                                    <div className="text-xs text-slate-400 font-bold mt-1">→ Stable</div>
-                                </div>
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                    <div className="text-xs font-bold text-slate-500 uppercase">Total Sent</div>
-                                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-1">12.4k</div>
-                                    <div className="text-xs text-emerald-500 font-bold mt-1">↑ 1.2k new</div>
-                                </div>
-                            </div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1 min-h-[300px]">
+                        <h3 className="font-bold text-slate-700 dark:text-slate-300 mb-6">Performance Trend</h3>
+                        <ResponsiveContainer width="100%" height="90%">
+                            <LineChart data={analyticsData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Line type="monotone" dataKey="openRate" stroke="#3b82f6" strokeWidth={3} dot={{r: 4}} name="Open Rate %" />
+                                <Line type="monotone" dataKey="clickRate" stroke="#10b981" strokeWidth={3} dot={{r: 4}} name="Click Rate %" />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
 
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1 min-h-[300px]">
-                                <h3 className="font-bold text-slate-700 dark:text-slate-300 mb-6">Performance Trend</h3>
-                                <ResponsiveContainer width="100%" height="90%">
-                                    <LineChart data={analyticsData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip 
-                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        />
-                                        <Line type="monotone" dataKey="openRate" stroke="#3b82f6" strokeWidth={3} dot={{r: 4}} name="Open Rate %" />
-                                        <Line type="monotone" dataKey="clickRate" stroke="#10b981" strokeWidth={3} dot={{r: 4}} name="Click Rate %" />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
+                {/* Lists & Automations Preview */}
+                <div className="flex flex-col gap-6">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden flex-1">
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-300 flex justify-between items-center">
+                            <span>Recent Campaigns</span>
+                            <span className="text-xs text-slate-400 font-normal">Last 30 Days</span>
                         </div>
-
-                        {/* Recent Campaigns */}
-                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden">
-                            <div className="p-4 border-b border-slate-100 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-300">
-                                Recent Campaigns
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                                {campaigns.map(camp => (
-                                    <div key={camp.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer group border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{camp.name}</h4>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold 
-                                                ${camp.status === 'sent' ? 'bg-emerald-100 text-emerald-600' : 
-                                                  camp.status === 'sending' ? 'bg-blue-100 text-blue-600' : 
-                                                  'bg-slate-100 text-slate-500'}`}>
-                                                {camp.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-2">{camp.subject}</p>
-                                        <div className="flex gap-3 text-xs font-mono text-slate-600 dark:text-slate-400">
-                                            <span>opens: <strong>{camp.openRate || 0}%</strong></span>
-                                            <span>clicks: <strong>{camp.clickRate || 0}%</strong></span>
-                                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                            {campaigns.map(camp => (
+                                <div key={camp.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer group border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{camp.name}</h4>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold 
+                                            ${camp.status === 'sent' ? 'bg-emerald-100 text-emerald-600' : 
+                                                camp.status === 'sending' ? 'bg-blue-100 text-blue-600' : 
+                                                'bg-slate-100 text-slate-500'}`}>
+                                            {camp.status}
+                                        </span>
                                     </div>
-                                ))}
-                            </div>
-                            <div className="p-3 border-t border-slate-100 dark:border-slate-700">
-                                <button className="w-full py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                                    View All Campaigns
-                                </button>
-                            </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-2">{camp.subject}</p>
+                                    <div className="flex gap-3 text-xs font-mono text-slate-600 dark:text-slate-400">
+                                        <span>opens: <strong>{camp.openRate || 0}%</strong></span>
+                                        <span>clicks: <strong>{camp.clickRate || 0}%</strong></span>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                </>
-            )}
+
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
+                        <h4 className="font-bold text-slate-700 dark:text-slate-300 text-sm mb-3">Active Automations</h4>
+                        <div className="space-y-2">
+                            {drips.slice(0, 3).map(d => (
+                                <div key={d.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700">
+                                    <span className="text-slate-700 dark:text-slate-300">{d.name}</span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${d.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                                        {d.status}
+                                    </span>
+                                </div>
+                            ))}
+                            {drips.length === 0 && <p className="text-xs text-slate-400 italic">No automations running.</p>}
+                        </div>
+                        <button onClick={() => handleCreateDrip()} className="w-full mt-3 text-xs font-bold text-blue-600 hover:underline">Manage All</button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

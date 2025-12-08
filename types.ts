@@ -168,6 +168,12 @@ export interface MarketingCampaign {
   influencerBrief?: string;
 }
 
+export interface ContentIdea {
+  title: string;
+  description: string;
+  angle: string;
+}
+
 export interface TranscriptItem {
   role: 'user' | 'model';
   text: string;
@@ -277,6 +283,12 @@ export interface SEOResult {
     readability: string;
 }
 
+export interface SEOKeyword {
+    keyword: string;
+    intent: 'Informational' | 'Commercial' | 'Transactional' | 'Navigational';
+    difficulty: 'High' | 'Medium' | 'Low';
+}
+
 // Academy
 export interface Course {
     id: string;
@@ -352,6 +364,7 @@ export interface Prospect {
   profileUrl?: string;
   confidence: number;
   status?: 'New' | 'Exported';
+  notes?: string;
 }
 
 export interface VersionHistory {
@@ -424,6 +437,37 @@ export interface EmailCampaign {
   clickRate?: number;
   sentCount?: number;
   type: 'broadcast' | 'drip';
+}
+
+export interface AudienceSegment {
+  id: string;
+  name: string;
+  criteria: {
+    field: 'status' | 'lead_score' | 'location' | 'role';
+    operator: 'equals' | 'contains' | 'greater_than';
+    value: string | number;
+  }[];
+  contactCount?: number;
+}
+
+export interface DripStep {
+  id: string;
+  delayDays: number;
+  subject: string;
+  body: string;
+}
+
+export interface DripSequence {
+  id: string;
+  name: string;
+  segmentId: string;
+  status: 'active' | 'paused' | 'draft';
+  steps: DripStep[];
+  stats?: {
+    enrolled: number;
+    completed: number;
+    openRate: number;
+  };
 }
 
 export interface Persona {

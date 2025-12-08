@@ -98,7 +98,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onThemeChange }) => {
               return { 
                   ...i, 
                   config: integrationConfig,
-                  connected: Object.values(integrationConfig).some(val => val.length > 5) // Mock validation
+                  // FIX: Added type check for 'val' before accessing 'length' property.
+                  connected: Object.values(integrationConfig).some(val => typeof val === 'string' && val.length > 5) // Mock validation
               };
           }
           return i;

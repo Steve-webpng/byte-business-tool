@@ -1,10 +1,9 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
-import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData, analyzeSEO, editContentWithAI, analyzeBrandVoice } from '../services/geminiService';
+import { generateMarketingContent, generateMarketingCampaign, generateImage, generateSpeech, decodeAudio, decodeAudioData, analyzeSEO, editContentWithAI, analyzeBrandVoice, suggestSEOKeywords, generateContentIdeas } from '../services/geminiService';
 import { saveItem, getSupabaseConfig, getSavedItems } from '../services/supabaseService';
 import { getProfile, formatProfileForPrompt, getCustomVoices, saveCustomVoice, deleteCustomVoice } from '../services/settingsService';
-import { MarketingCampaign, SavedItem, AppTool, SEOResult } from '../types';
+import { MarketingCampaign, SavedItem, AppTool, SEOResult, SEOKeyword, ContentIdea } from '../types';
 import { Icons } from '../constants';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useToast } from './ToastContainer';
@@ -17,13 +16,14 @@ interface ContentGeneratorProps {
 }
 
 const VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
+const DRAFT_KEY = 'byete_content_draft';
 
 const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, workflowData, clearWorkflowData, onWorkflowSend }) => {
   const [topic, setTopic] = useState('');
   const [type, setType] = useState('Email');
   const [tone, setTone] = useState('Professional');
   const [customTone, setCustomTone] = useState('');
-  const [mode, setMode] = useState<'Single' | 'Campaign' | 'Image' | 'VoiceMatch'>('Single');
+  const [mode, setMode] = useState<'Single' | 'Campaign' | 'Image' | 'VoiceMatch' | 'Ideas'>('Single');
   const [generatedText, setGeneratedText] = useState('');
   const [generatedImage, setGeneratedImage] = useState('');
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
@@ -34,12 +34,20 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  // Ideas Mode State
+  const [ideas, setIdeas] = useState<ContentIdea[]>([]);
+  
+  // Auto-save state
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  
   // Custom Tones
   const [savedTones, setSavedTones] = useState<string[]>([]);
   
   // Power-up states
   const [seoResult, setSeoResult] = useState<SEOResult | null>(null);
   const [seoLoading, setSeoLoading] = useState(false);
+  const [suggestedKeywords, setSuggestedKeywords] = useState<SEOKeyword[]>([]);
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
   const [voiceSample, setVoiceSample] = useState('');
   
   // Audio state
@@ -52,6 +60,51 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
   const [isDictating, setIsDictating] = useState(false);
   const recognitionRef = useRef<any>(null);
   const toast = useToast();
+
+  // Load Draft on Mount
+  useEffect(() => {
+      // If workflow data is coming in, ignore draft
+      if (workflowData) {
+          setIsDraftLoaded(true);
+          return;
+      }
+
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
+      if (savedDraft) {
+          try {
+              const parsed = JSON.parse(savedDraft);
+              setTopic(parsed.topic || '');
+              setType(parsed.type || 'Email');
+              setTone(parsed.tone || 'Professional');
+              setCustomTone(parsed.customTone || '');
+              setMode(parsed.mode || 'Single');
+              setGeneratedText(parsed.generatedText || '');
+              setGeneratedImage(parsed.generatedImage || '');
+              setCampaign(parsed.campaign || null);
+              if (parsed.topic || parsed.generatedText) {
+                  toast.show("Restored previous draft", "info");
+              }
+          } catch (e) {
+              console.error("Failed to load draft", e);
+          }
+      }
+      setIsDraftLoaded(true);
+  }, []);
+
+  // Save Draft on Change
+  useEffect(() => {
+      if (!isDraftLoaded) return;
+      
+      const draft = {
+          topic, type, tone, customTone, mode,
+          generatedText, generatedImage, campaign
+      };
+      
+      // Only save if there is something substantial
+      if (topic || generatedText || campaign || generatedImage) {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+  }, [topic, type, tone, customTone, mode, generatedText, generatedImage, campaign, isDraftLoaded]);
 
   useEffect(() => {
     if (workflowData && clearWorkflowData) {
@@ -75,6 +128,20 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
       setRecentDrafts(items.filter(i => i.tool_type === 'Content').slice(0, 5));
   }
 
+  const handleClearDraft = () => {
+      if(confirm("Are you sure you want to start fresh? This will clear your current draft.")) {
+          setTopic('');
+          setGeneratedText('');
+          setGeneratedImage('');
+          setCampaign(null);
+          setSeoResult(null);
+          setSuggestedKeywords([]);
+          setIdeas([]);
+          localStorage.removeItem(DRAFT_KEY);
+          toast.show("Draft cleared", "info");
+      }
+  };
+
   const handleSaveCustomTone = () => {
       if(!customTone) return;
       saveCustomVoice(customTone);
@@ -95,6 +162,8 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
     setGeneratedImage('');
     setCampaign(null);
     setSeoResult(null);
+    setSuggestedKeywords([]);
+    setIdeas([]);
     
     try {
       const profile = getProfile();
@@ -108,6 +177,9 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
           const camp = await generateMarketingCampaign(topic, finalTone, context);
           setCampaign(camp);
           setActiveTab('email');
+      } else if (mode === 'Ideas') {
+          const ideasList = await generateContentIdeas(topic, context);
+          setIdeas(ideasList);
       } else if (mode === 'VoiceMatch') {
           if(!voiceSample) throw new Error("Please enter sample text.");
           const voiceAnalysis = await analyzeBrandVoice(voiceSample);
@@ -127,6 +199,13 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
     }
   };
 
+  const handleUseIdea = (idea: ContentIdea) => {
+      setTopic(idea.description);
+      setMode('Single');
+      // Optionally pre-select type based on angle if feasible, but user choice is better
+      toast.show(`Drafting: ${idea.title}`, "info");
+  };
+
   const handleAnalyzeSEO = async () => {
       if (!generatedText) return;
       setSeoLoading(true);
@@ -138,6 +217,25 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
       } finally {
           setSeoLoading(false);
       }
+  };
+
+  const handleSuggestKeywords = async () => {
+      if (!topic) return;
+      setKeywordsLoading(true);
+      try {
+          const keywords = await suggestSEOKeywords(topic, generatedText);
+          setSuggestedKeywords(keywords);
+          toast.show("Keywords generated!", "success");
+      } catch (e) {
+          toast.show("Failed to get keywords.", "error");
+      } finally {
+          setKeywordsLoading(false);
+      }
+  };
+
+  const handleInsertKeyword = (keyword: string) => {
+      setGeneratedText(prev => prev + ` ${keyword} `);
+      toast.show("Keyword inserted!", "success");
   };
 
   const handleModifyText = async (instruction: string) => {
@@ -163,6 +261,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
     if (mode === 'Single') contentToSave = generatedText;
     else if (mode === 'Campaign') contentToSave = JSON.stringify(campaign, null, 2);
     else if (mode === 'Image') contentToSave = generatedImage;
+    else if (mode === 'Ideas') contentToSave = JSON.stringify(ideas, null, 2);
 
     if (!contentToSave) return;
 
@@ -170,6 +269,8 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
     if (res.success) {
         toast.show("Content saved successfully!", "success");
         refreshHistory();
+        // Optional: Clear draft after successful save? 
+        // localStorage.removeItem(DRAFT_KEY);
     } else {
         toast.show(`Failed to save: ${res.error}`, "error");
     }
@@ -298,12 +399,28 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                      </div>
                  )}
              </div>
-             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+             
+             {/* Reset Button */}
+             <button
+                onClick={handleClearDraft}
+                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold mr-2"
+                title="Clear current draft"
+             >
+                 <Icons.X /> Reset
+             </button>
+
+             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex-wrap justify-end">
                 <button 
                     onClick={() => setMode('Single')}
                     className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Single' ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     Text
+                </button>
+                <button 
+                    onClick={() => setMode('Ideas')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'Ideas' ? 'bg-white dark:bg-slate-700 shadow text-amber-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Brainstorm
                 </button>
                 <button 
                     onClick={() => setMode('Campaign')}
@@ -321,7 +438,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                     onClick={() => setMode('VoiceMatch')}
                     className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'VoiceMatch' ? 'bg-white dark:bg-slate-700 shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                    Voice Match
+                    Voice
                 </button>
              </div>
           </div>
@@ -355,7 +472,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
               </div>
           ) : (
               <>
-                {mode !== 'Image' && (
+                {mode !== 'Image' && mode !== 'Ideas' && (
                     <>
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
@@ -433,7 +550,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                         value={topic}
                         onChange={(e) => setTopic(e.target.value)}
                         className={`w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 ${isWidget ? 'h-20 text-sm' : 'min-h-[140px]'}`}
-                        placeholder={isDictating ? "Listening..." : "e.g. Announce a summer sale..."}
+                        placeholder={isDictating ? "Listening..." : mode === 'Ideas' ? "e.g. New Product Launch" : "e.g. Announce a summer sale..."}
                     />
                     </div>
 
@@ -444,6 +561,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                             ${loading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 
                             mode === 'Image' ? 'bg-pink-600 hover:bg-pink-700' : 
                             mode === 'Campaign' ? 'bg-purple-600 hover:bg-purple-700' :
+                            mode === 'Ideas' ? 'bg-amber-600 hover:bg-amber-700' :
                             'bg-blue-600 hover:bg-blue-700'
                             }`}
                     >
@@ -453,7 +571,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                                 Generating...
                             </span>
                         ) : (
-                            mode === 'Image' ? 'Generate Image' : 'Generate Content'
+                            mode === 'Image' ? 'Generate Image' : mode === 'Ideas' ? 'Brainstorm Ideas' : 'Generate Content'
                         )}
                     </button>
                 </div>
@@ -465,10 +583,10 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
         <div className={`${isWidget ? 'col-span-1' : 'lg:col-span-8'} bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col ${isWidget ? 'h-64' : 'min-h-[500px]'}`}>
           <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
             <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase tracking-wide flex items-center gap-2">
-                {mode === 'Image' ? <Icons.Photo /> : <Icons.DocumentText />} Result
+                {mode === 'Image' ? <Icons.Photo /> : mode === 'Ideas' ? <Icons.Sparkles /> : <Icons.DocumentText />} Result
             </h3>
             <div className="flex gap-2 items-center">
-                 {generatedText && mode !== 'Image' && (
+                 {generatedText && mode !== 'Image' && mode !== 'Ideas' && (
                      <button
                         onClick={() => setShowPreview(!showPreview)}
                         className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border ${showPreview ? 'bg-blue-100 text-blue-700 border-blue-200' : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50'}`}
@@ -476,7 +594,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                          {showPreview ? 'Edit' : 'Preview'}
                      </button>
                  )}
-                 {onWorkflowSend && (generatedText || campaign) && (
+                 {onWorkflowSend && (generatedText || campaign || ideas.length > 0) && (
                     <button onClick={() => {
                         let data = generatedText;
                         if(campaign) {
@@ -487,11 +605,22 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                             else if(activeTab === 'viral') data = campaign.viralHook || '';
                             else if(activeTab === 'influencer') data = campaign.influencerBrief || '';
                         }
+                        if(mode === 'Ideas' && ideas.length > 0) {
+                            data = ideas.map(i => `**${i.title}**\n*${i.angle}*\n${i.description}`).join('\n\n');
+                        }
                         onWorkflowSend(AppTool.DOCUMENTS, data);
                     }}
                     className="text-xs flex items-center gap-1 font-bold px-3 py-1.5 rounded-lg transition-colors text-slate-500 dark:text-slate-300 hover:text-blue-600 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600"
                     >
                         <Icons.Share /> Send to Doc
+                    </button>
+                 )}
+                 
+                 {onWorkflowSend && (generatedText) && mode !== 'Ideas' && (
+                    <button onClick={() => onWorkflowSend(AppTool.SOCIAL_MEDIA, generatedText)}
+                    className="text-xs flex items-center gap-1 font-bold px-3 py-1.5 rounded-lg transition-colors text-pink-500 hover:text-pink-600 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800"
+                    >
+                        <Icons.Share /> Schedule Post
                     </button>
                  )}
                  
@@ -519,7 +648,7 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                      </div>
                  )}
 
-                 {getSupabaseConfig() && (generatedText || campaign || generatedImage) && (
+                 {getSupabaseConfig() && (generatedText || campaign || generatedImage || ideas.length > 0) && (
                     <button 
                         onClick={handleSave}
                         disabled={saving}
@@ -549,6 +678,26 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
                         <Icons.Photo />
                         <p className="text-sm mt-2">Image will appear here</p>
+                    </div>
+                )
+            ) : mode === 'Ideas' ? (
+                ideas.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {ideas.map((idea, i) => (
+                            <div key={i} onClick={() => handleUseIdea(idea)} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-blue-300 cursor-pointer transition-all group">
+                                <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-1 group-hover:text-blue-600">{idea.title}</h4>
+                                <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">{idea.angle}</span>
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">{idea.description}</p>
+                                <div className="mt-3 text-xs font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                    <Icons.Pen /> Draft This
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                        <div className="mb-2 text-slate-300 dark:text-slate-600"><Icons.Sparkles /></div>
+                        <p className="italic">Generate creative angles for your content...</p>
                     </div>
                 )
             ) : mode === 'Campaign' && campaign ? (
@@ -626,6 +775,30 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                             </div>
                         ) : (
                             <>
+                                {suggestedKeywords.length > 0 && (
+                                    <div className="mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
+                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase flex items-center gap-2 mb-3">
+                                            <Icons.Tag /> SEO Keyword Strategy
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {suggestedKeywords.map((kw, i) => (
+                                                <button 
+                                                    key={i} 
+                                                    onClick={() => handleInsertKeyword(kw.keyword)}
+                                                    className={`text-xs px-2 py-1 rounded-lg border flex items-center gap-2 transition-all hover:shadow-sm
+                                                        ${kw.difficulty === 'Low' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-400' :
+                                                          kw.difficulty === 'Medium' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' :
+                                                          'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400'
+                                                        }`}
+                                                    title={`Difficulty: ${kw.difficulty}, Intent: ${kw.intent}`}
+                                                >
+                                                    <span className="font-bold">{kw.keyword}</span>
+                                                    <span className="opacity-70 text-[10px] uppercase hidden sm:inline">{kw.intent}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 {seoResult && (
                                     <div className="mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
                                         <div className="flex items-center justify-between mb-3">
@@ -654,6 +827,13 @@ const ContentGenerator: React.FC<ContentGeneratorProps> = ({ isWidget = false, w
                                 
                                 {/* Power-Up Toolbar */}
                                 <div className="absolute bottom-4 right-4 flex gap-2">
+                                    <button 
+                                        onClick={handleSuggestKeywords}
+                                        disabled={keywordsLoading}
+                                        className="text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
+                                    >
+                                        {keywordsLoading ? 'Thinking...' : <><Icons.Tag /> Keywords</>}
+                                    </button>
                                     <button 
                                         onClick={handleAnalyzeSEO} 
                                         disabled={seoLoading}

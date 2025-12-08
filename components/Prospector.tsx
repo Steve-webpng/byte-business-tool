@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../constants';
-import { discoverLeads, runGenericTool } from '../services/geminiService';
+import { discoverLeads, runGenericTool, enrichContactData } from '../services/geminiService';
 import { saveContact } from '../services/supabaseService';
 import { useToast } from './ToastContainer';
 import { Prospect, AppTool } from '../types';
@@ -46,6 +46,37 @@ const Prospector: React.FC = () => {
         }
     };
 
+    const handleEnrichLead = async (index: number) => {
+        const lead = leads[index];
+        toast.show(`Enriching data for ${lead.name}...`, "info");
+        
+        try {
+            // Create a temporary Contact object for enrichment
+            const tempContact = {
+                name: lead.name,
+                company: lead.company,
+                role: lead.role,
+                status: 'Lead',
+                email: lead.email || '',
+                notes: ''
+            } as any;
+
+            const enrichedInfo = await enrichContactData(tempContact);
+            
+            // Update the lead in the list with the new info
+            const updatedLeads = [...leads];
+            updatedLeads[index] = {
+                ...lead,
+                confidence: 95, // Boost confidence
+                notes: enrichedInfo // Store extra info
+            };
+            setLeads(updatedLeads);
+            toast.show("Enrichment complete!", "success");
+        } catch (e) {
+            toast.show("Enrichment failed.", "error");
+        }
+    };
+
     const handleBulkAddToCRM = async () => {
         const leadsToAdd = selectedLeads.map(i => leads[i]);
         if (leadsToAdd.length === 0) return;
@@ -60,7 +91,7 @@ const Prospector: React.FC = () => {
                 phone: prospect.phone || '',
                 location: prospect.location || '',
                 status: 'Lead',
-                notes: `Added via Prospector (${platform})`,
+                notes: `Added via Prospector (${platform}).\n\n${prospect.notes || ''}`, // Include enriched notes if any
                 workspace_id: '' // Handled by service
             });
             count++;
@@ -90,27 +121,8 @@ const Prospector: React.FC = () => {
 
         try {
             const template = await runGenericTool(prompt, "You are an expert copywriter.");
-            
-            // Navigate to Content/Email tool with this data
-            // Since we don't have a direct "pass data" to EmailMarketing component via props in the router easily without context,
-            // We will use the ContentGenerator as the bridge or just copy to clipboard for now.
-            // Better: Navigate to Content Tool and pre-fill.
-            
-            // For now, let's copy to clipboard and show success, or navigate to Content tool
-            // navigate(AppTool.CONTENT, { ... } ); // If we updated navigation context to support data passing
-            
-            // Simulating navigation with data via localStorage or Context would be ideal.
-            // For this implementation, we will use the existing 'onWorkflowSend' pattern if available, 
-            // but here we are inside the component. We'll simply copy to clipboard or show in a modal.
-            
-            // Let's assume we want to push this to the Content Generator.
-            // We can't easily push to a specific component without a global store for "workflow draft".
-            // Let's use the clipboard as a fallback for the "Mail Merge Automation" experience.
-            
             const fullOutput = `*** MAIL MERGE TEMPLATE ***\n\n${template}\n\n*** RECIPIENT LIST ***\n${leadsToEmail.map(l => `${l.name} <${l.email}>`).join('\n')}`;
             
-            // In a real app, this would route to <EmailMarketing> with pre-filled state.
-            // Here we will use a workaround to show we "integrated" it.
             navigator.clipboard.writeText(fullOutput);
             toast.show("Outreach template copied to clipboard! Paste in Email Marketing.", "success");
             navigate(AppTool.EMAIL_MARKETING); // Go there
@@ -122,9 +134,9 @@ const Prospector: React.FC = () => {
 
     const handleExportCSV = () => {
         const leadsToExport = selectedLeads.length > 0 ? selectedLeads.map(i => leads[i]) : leads;
-        const headers = ["Name", "Role", "Company", "Email", "Phone", "Location", "Platform", "Profile URL"];
+        const headers = ["Name", "Role", "Company", "Email", "Phone", "Location", "Platform", "Profile URL", "Notes"];
         const rows = leadsToExport.map(l => [
-            l.name, l.role, l.company, l.email || '', l.phone || '', l.location || '', l.socialPlatform || '', l.profileUrl || ''
+            l.name, l.role, l.company, l.email || '', l.phone || '', l.location || '', l.socialPlatform || '', l.profileUrl || '', (l.notes || '').replace(/\n/g, ' ')
         ]);
         
         const csvContent = [
@@ -154,7 +166,6 @@ const Prospector: React.FC = () => {
             status: 'New'
         };
         setCapturedLeads([newLead, ...capturedLeads]);
-        // Auto-add logic if needed
         toast.show("New lead captured from form!", "success");
     };
 
@@ -310,8 +321,21 @@ const Prospector: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </div>
+                                                
+                                                {lead.notes && (
+                                                    <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-slate-600 dark:text-slate-400 border border-yellow-100 dark:border-yellow-900/50">
+                                                        <strong className="text-yellow-700 dark:text-yellow-500">Enriched Data:</strong> {lead.notes}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
+                                        <button 
+                                            onClick={() => handleEnrichLead(idx)}
+                                            className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                                            title="Use AI to find more details about this person"
+                                        >
+                                            <Icons.Sparkles /> Enrich
+                                        </button>
                                     </div>
                                 ))}
                             </div>

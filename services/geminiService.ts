@@ -1,7 +1,6 @@
-
 import { GoogleGenAI, Type, LiveServerMessage, Modality, Chat, GenerateContentResponse } from "@google/genai";
 // FIX: Added 'Contact' and 'Deal' to type imports for use in new functions.
-import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene, VideoAspectRatio, SWOTAnalysis, Prospect } from "../types";
+import { AnalysisResult, Task, ChatMessage, MarketingCampaign, Contact, TranscriptItem, Deal, SEOResult, ChartDataPoint, Course, VideoScene, VideoAspectRatio, SWOTAnalysis, Prospect, SEOKeyword, ContentIdea, DripStep } from "../types";
 import { getApiKey, getModelPreference } from "./settingsService";
 import { getSavedItems } from "./supabaseService";
 
@@ -30,6 +29,38 @@ export const generateMarketingContent = async (topic: string, type: string, tone
   }
   const response = await ai.models.generateContent({ model: getModel(), contents: prompt });
   return response.text || "No content generated.";
+};
+
+export const generateContentIdeas = async (topic: string, context?: string): Promise<ContentIdea[]> => {
+    const ai = getAIClient();
+    const prompt = `${context || ''}\n\nGenerate 5 creative, high-engagement social media post ideas about: "${topic}".
+    Format: List of 5 distinct concepts (e.g. 'Teaser with a Twist', 'Behind the Scenes', 'Controversial Take', 'How-To', 'Storytelling').
+    
+    Return strict JSON array of objects with:
+    - title: A catchy name for the angle
+    - angle: The type of post (Educational, Entertaining, Promotional)
+    - description: A brief description of what the post should say or show.`;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING },
+                        angle: { type: Type.STRING },
+                        description: { type: Type.STRING }
+                    },
+                    required: ["title", "angle", "description"]
+                }
+            }
+        }
+    });
+    return JSON.parse(response.text || "[]");
 };
 
 export const analyzeBrandVoice = async (sampleText: string): Promise<string> => {
@@ -65,6 +96,37 @@ export const generateMarketingCampaign = async (topic: string, tone: string, con
   return JSON.parse(response.text || "{}") as MarketingCampaign;
 };
 
+export const generateDripSequence = async (goal: string, audience: string, context?: string): Promise<DripStep[]> => {
+    const ai = getAIClient();
+    const prompt = `${context || ''}\n\nCreate a Drip Email Sequence.\nGoal: ${goal}\nTarget Audience: ${audience}\n\nGenerate 3-5 emails that flow logically (e.g., Welcome -> Value Add -> Offer). define the delay in days for each.\n\nReturn strict JSON Array of objects with 'delayDays', 'subject', 'body'.`;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        delayDays: { type: Type.NUMBER, description: "Days to wait after previous email (0 for immediate)" },
+                        subject: { type: Type.STRING },
+                        body: { type: Type.STRING, description: "Email body in Markdown" }
+                    },
+                    required: ["delayDays", "subject", "body"]
+                }
+            }
+        }
+    });
+    
+    const steps = JSON.parse(response.text || "[]");
+    return steps.map((s: any) => ({
+        ...s,
+        id: `step-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+    }));
+};
+
 export const analyzeSEO = async (content: string): Promise<SEOResult> => {
     const ai = getAIClient();
     const prompt = `Analyze the following content for SEO effectiveness.\nContent: "${content.substring(0, 2000)}..."\n\nProvide:\n1. A Score (0-100).\n2. Detected Keywords (top 5).\n3. Suggestions for improvement (max 3).\n4. Readability Grade (e.g. "8th Grade", "University").\n\nReturn strict JSON.`;
@@ -86,6 +148,39 @@ export const analyzeSEO = async (content: string): Promise<SEOResult> => {
         }
     });
     return JSON.parse(response.text || "{}") as SEOResult;
+};
+
+export const suggestSEOKeywords = async (topic: string, content: string): Promise<SEOKeyword[]> => {
+    const ai = getAIClient();
+    const prompt = `Suggest 10 high-potential SEO keywords (short-tail and long-tail) for the topic: "${topic}".
+    Context/Draft: "${content.substring(0, 1000)}..."
+    
+    For each keyword, estimate:
+    1. Search Intent (Informational, Commercial, Transactional, Navigational)
+    2. Difficulty (High, Medium, Low)
+    
+    Return strict JSON array of objects.`;
+    
+    const response = await ai.models.generateContent({
+        model: getModel(),
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { 
+                    type: Type.OBJECT,
+                    properties: {
+                        keyword: { type: Type.STRING },
+                        intent: { type: Type.STRING, enum: ['Informational', 'Commercial', 'Transactional', 'Navigational'] },
+                        difficulty: { type: Type.STRING, enum: ['High', 'Medium', 'Low'] }
+                    },
+                    required: ['keyword', 'intent', 'difficulty']
+                }
+            }
+        }
+    });
+    return JSON.parse(response.text || "[]");
 };
 
 export const generateImage = async (prompt: string): Promise<string> => {
@@ -232,37 +327,52 @@ export const generateFollowUpEmail = async (contact: Contact, context?: string):
 
 export const discoverLeads = async (query: string, platform?: string): Promise<Prospect[]> => {
     const ai = getAIClient();
-    const platformSpecific = platform ? `Focus search results specifically on ${platform}.` : '';
-    const prompt = `Using Google Search, identify 6-10 high-quality business leads matching: "${query}".
+    const platformSpecific = platform ? `Focus search results specifically on business profiles from ${platform}.` : '';
+    
+    const prompt = `You are a B2B Lead Researcher performing market research.
+    Task: Find 5-10 real, public business profiles matching this query: "${query}".
     ${platformSpecific}
     
-    For each lead, perform a deep search to find:
+    Step 1: Use Google Search to find real people/companies matching the description.
+    Step 2: For each person found, extract:
     - Name
-    - Role
-    - Company
+    - Job Title (Role)
+    - Company Name
     - Location (City/Country)
-    - Guess/Find Email (professional format)
-    - Social Profile URL (e.g. LinkedIn, Twitter, Instagram link if found)
+    - Profile URL (LinkedIn, Twitter, Company Team Page, etc.)
     
-    Return a JSON array of objects with "name", "role", "company", "location", "email", "phone", "profileUrl".`;
+    Step 3: INFER a likely professional email address based on common company patterns (e.g. first.last@company.com). Mark this as inferred.
     
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: { tools: [{ googleSearch: {} }] },
-    });
+    Return a STRICT JSON Array of objects. Do not include any markdown formatting outside the JSON.
+    Example Format:
+    [
+      { "name": "John Doe", "role": "CEO", "company": "Acme Inc", "location": "New York", "email": "john.doe@acme.com", "profileUrl": "https://linkedin.com/in/johndoe", "confidence": 85 }
+    ]`;
     
-    const text = response.text?.trim();
-    if (!text) return [];
     try {
-      const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
-      const leads = JSON.parse(jsonStr);
-      return Array.isArray(leads) ? leads.map((l: any) => ({
-          ...l, 
-          socialPlatform: platform || 'LinkedIn', // Default or dynamic
-          confidence: 85
-      })) : [];
-    } catch (e) { return []; }
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-pro-preview',
+          contents: prompt,
+          config: { tools: [{ googleSearch: {} }] },
+        });
+        
+        const text = response.text || "";
+        if (!text) return [];
+
+        // Robust parsing: Find the JSON array within the text
+        const jsonMatch = text.match(/\[.*\]/s);
+        const jsonStr = jsonMatch ? jsonMatch[0] : text.replace(/```json\n?|\n?```/g, '').trim();
+        
+        const leads = JSON.parse(jsonStr);
+        return Array.isArray(leads) ? leads.map((l: any) => ({
+            ...l, 
+            socialPlatform: platform || 'LinkedIn', 
+            status: 'New'
+        })) : [];
+    } catch (e) { 
+        console.error("Lead Discovery Error:", e);
+        return []; 
+    }
 };
 
 export const suggestNextDealAction = async (deal: Deal, contact: Contact): Promise<string> => {
@@ -306,11 +416,12 @@ export const performMarketResearch = async (query: string, context?: string, mod
   if (mode === 'competitor') {
       instruction += `\nFocus on direct competitors. Provide a Competitor Matrix.`;
   } else if (mode === 'trends') {
-      instruction += `\nFocus on identifying rising trends, viral topics, and market shifts related to the query. Provide a 'Trend Report' with bullet points on:
-      - Social Media Buzz
-      - Search Interest
-      - Consumer Behavior Shifts
-      - Future Outlook`;
+      instruction += `\nFocus on identifying rising trends related to the query. Provide a 'Trend Report' that includes:
+- **Google Trends Analysis:** Summarize search interest over time based on Google Trends data. Identify breakout keywords.
+- **Social Media Buzz:** Analyze trends on platforms like X (Twitter), TikTok, and Instagram. What are popular hashtags, topics, and general sentiment?
+- **Popular Keywords:** List 5-10 popular and rising keywords related to the topic.
+- **Sentiment Analysis:** Describe the overall public sentiment (Positive, Negative, Neutral, Mixed) with a brief explanation.
+- **Future Outlook:** Predict where this trend is heading in the next 6-12 months.`;
   }
 
   const prompt = context ? `${context}\n\n${instruction}` : instruction;
